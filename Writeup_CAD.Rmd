@@ -1188,7 +1188,190 @@ Add an interactive plotly graph to your reproducible document. Compile to HTML.
 
 
 
-# FIN WORKSHOP 1
+## Deterministic Models
+
+
+
+
+
+```{r}
+if(require(deSolve)){library(deSolve)}else{install.packages("deSolve");library(deSolve)}
+
+
+sir.model.closed <- function (t, x, params) {    #here we begin a function with three arguments
+  S <- x[1]                               #create local variable S, the first element of x
+  I <- x[2]                               #create local variable I
+  R <- x[3]                               #create local variable R
+  with(                                   #we can simplify code using "with"
+       as.list(params),                   #this argument to "with" lets us use the variable names
+       {                                  #the system of rate equations
+         dS <- -beta*S*I
+         dI <- beta*S*I-gamma*I
+         dR <- gamma*I
+         dx <- c(dS,dI,dR)                #combine results into a single vector dx
+         list(dx)                         #return result as a list
+       }
+       )
+}
+
+
+times <- seq(0,120,by=5)                    #function seq returns a sequence
+params <- c(beta=0.3,gamma=1/7)             #function c "c"ombines values into a vector
+xstart <- c(S=9999/10000,I=1/10000,R=0)     #initial conditions
+
+
+out <- as.data.frame(ode(xstart,times,sir.model.closed,params))  #result stored in dataframe
+
+
+op <- par(fig=c(0,0.5,0,1),mar=c(4,4,1,1))                  #set graphical parameters
+plot(I~time,data=out,type='b')                              #plot the I variable against time
+par(fig=c(0.5,1,0,1),mar=c(4,1,1,1),new=T)                  #re-set graphical parameters
+plot(I~S,data=out,type='b',yaxt='n',xlab='S')               #plot phase portrait
+par(op)                                                     #re-set graphical parameters
+
+```
+
+
+
+
+
+### Exercise 1
+
+Explore the dynamics of the system for different values of the $\beta$ and $\gamma$ parameters by simulating and plotting trajectories as time series and in phase space (e.g. *I* vs. *S*).
+
+```{r}
+betas <- seq(0.2, 0.6, 0.2)
+gammas <- 1/c(3,7,9,11)
+
+sim.params <- expand.grid(beta=betas, gamma=gammas)
+
+for(i in 1:nrow(sim.params)){
+  params <- sim.params[i,]
+  
+  out <- as.data.frame(ode(xstart,times,sir.model.closed,params)) 
+
+
+op <- par(fig=c(0,0.5,0,1),mar=c(4,4,1,1))            
+plot(I~time,data=out,type='b')
+text(x=50,y=0, label=paste0("Beta=",round(params[1],2)," and Gamma=", round(params[2],2)))
+par(fig=c(0.5,1,0,1),mar=c(4,1,1,1),new=T)       
+plot(I~S,data=out,type='b',yaxt='n',xlab='S')   
+
+par(op)                                    
+
+}
+```
+
+### Exercise 2
+
+Explore the dynamics of the system for one set of $\beta$ and $\gamma$ at different initial conditions. What happens if there is pre-existing immunity in the population?
+
+```{r}
+params <- c(beta=0.3,gamma=1/7)             #function c "c"ombines values into a vector
+xstart <- c(S=9999/10000,I=1/10000,R=0)     #initial conditions
+xstart <- c(S=1000/10000,I=1/10000,R=8999) 
+
+out <- as.data.frame(ode(xstart,times,sir.model.closed,params))  #result stored in dataframe
+
+
+op <- par(fig=c(0,0.5,0,1),mar=c(4,4,1,1))                  #set graphical parameters
+plot(I~time,data=out,type='b')                              #plot the I variable against time
+par(fig=c(0.5,1,0,1),mar=c(4,1,1,1),new=T)                  #re-set graphical parameters
+plot(I~S,data=out,type='b',yaxt='n',xlab='S')               #plot phase portrait
+par(op)  
+```
+
+
+### Exercise 3
+
+Modify the codes given to study the dynamics of a demographically open *SIR* model.
+
+
+
+
+```{r}
+if(require(deSolve)){library(deSolve)}else{install.packages("deSolve");library(deSolve)}
+
+
+sir.model.closed <- function (t, x, params) {    #here we begin a function with three arguments
+  S <- x[1]                               #create local variable S, the first element of x
+  I <- x[2]                               #create local variable I
+  R <- x[3]                               #create local variable R
+  with(                                   #we can simplify code using "with"
+       as.list(params),                   #this argument to "with" lets us use the variable names
+       {                                  #the system of rate equations
+         dS <- births-beta*S*I-mu*S
+         dI <- beta*S*I-gamma*I-mu*I
+         dR <- gamma*I-mu*R
+         dx <- c(dS,dI,dR)                #combine results into a single vector dx
+         list(dx)                         #return result as a list
+       }
+       )
+}
+
+
+times <- seq(0,120,by=5)                    #function seq returns a sequence
+params <- c(beta=0.3,gamma=1/7, births=1/(365), mu=1/(365))             #function c "c"ombines values into a vector
+xstart <- c(S=9999/10000,I=1/10000,R=0)     #initial conditions
+
+
+out <- as.data.frame(ode(xstart,times,sir.model.closed,params))  #result stored in dataframe
+
+
+op <- par(fig=c(0,0.5,0,1),mar=c(4,4,1,1))                  #set graphical parameters
+plot(I~time,data=out,type='b')                              #plot the I variable against time
+par(fig=c(0.5,1,0,1),mar=c(4,1,1,1),new=T)                  #re-set graphical parameters
+plot(I~S,data=out,type='b',yaxt='n',xlab='S')               #plot phase portrait
+par(op)                                                     #re-set graphical parameters
+
+```
+
+
+### Exercise 4
+
+Modify the codes given to study the dynamics of an *SEIR* model. 
+
+
+```{r}
+if(require(deSolve)){library(deSolve)}else{install.packages("deSolve");library(deSolve)}
+
+
+sir.model.closed <- function (t, x, params) {    #here we begin a function with three arguments
+  S <- x[1]                               #create local variable S, the first element of x
+  E <- x[2]
+  I <- x[3]                               #create local variable I
+  R <- x[4]                               #create local variable R
+  with(                                   #we can simplify code using "with"
+       as.list(params),                   #this argument to "with" lets us use the variable names
+       {                                  #the system of rate equations
+         dS <- births-beta*S*I-mu*S
+         dE <- beta*S*I-lambda*E
+         dI <- lambda*E-gamma*I-mu*I
+         dR <- gamma*I-mu*R
+         dx <- c(dS,dE,dI,dR)                #combine results into a single vector dx
+         list(dx)                         #return result as a list
+       }
+       )
+}
+
+
+times <- seq(0,200,by=5)                    #function seq returns a sequence
+params <- c(beta=0.3,gamma=1/7, births=1/(365), mu=1/(365), lambda=1/3)             #function c "c"ombines values into a vector
+xstart <- c(S=9999/10000, E=0, I=1/10000, R=0)     #initial conditions
+
+
+out <- as.data.frame(ode(xstart,times,sir.model.closed,params))  #result stored in dataframe
+out1 <- as.data.frame(lsoda(xstart,times,sir.model.closed,params))
+
+op <- par(fig=c(0,0.5,0,1),mar=c(4,4,1,1))                  #set graphical parameters
+plot(I~time,data=out,type='b')                              #plot the I variable against time
+par(fig=c(0.5,1,0,1),mar=c(4,1,1,1),new=T)                  #re-set graphical parameters
+plot(I~S,data=out,type='b',yaxt='n',xlab='S')               #plot phase portrait
+par(op)                                                     #re-set graphical parameters
+
+```
+
+
 
 
 
