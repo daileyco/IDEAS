@@ -1,0 +1,1200 @@
+---
+title: "IDEAS Computational Workshop"
+author: "Cody Dailey"
+date: "May 13, 2019"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=FALSE)
+```
+
+
+# Module 1 
+
+```{r packages, message=FALSE, warning=FALSE, error=FALSE}
+if(require(lubridate)){library(lubridate)}else{install.packages("lubridate");library(lubridate)}
+if(require(ggplot2)){library(ggplot2)}else{install.packages("ggplot2");library(ggplot2)}
+#if(require(ggplot2-exts)){library(ggplot2-exts)}else{install.packages("ggplot2-exts");library(ggplot2-exts)}
+if(require(plotly)){library(plotly)}else{install.packages("plotly");library(plotly)}
+```
+
+## Data Visualization
+
+```{r import}
+mers <- read.csv("./Data/cases.csv")
+```
+
+
+
+```{r clean}
+# mers$hospitalized[890] == 2012-02-20
+mers$hospitalized[890] <- c('2015-02-20')
+
+# ?
+mers <- mers[-471,]
+```
+
+```{r dates}
+mers$onset2 <- ymd(mers$onset)
+mers$hospitalized2 <- ymd(mers$hospitalized)
+
+
+day0 <- min(na.omit(mers$onset2))
+
+mers$epi.day <- as.numeric(mers$onset2-day0)
+```
+
+### Question 1.1 
+
+Why do we use the function na.omit? What happens if we neglect this command?
+
+If we were to take the min() of a vector with missing values, the returned minimum would be missing as well. Using na.omit() tells the computer to ignore the missing values which is then passed to min() as a complete vector. 
+
+### Question 1.2 
+
+What purpose does the command as.numeric serve?
+
+That function tells R to treat the calculated values as numeric, continuous data, rather than a difference in dates. 
+
+
+### Exercise 1.1 
+
+To produce this plot, type all the commands up to this point exactly as they appear. Particularly, note that as we "build" the plot in the last code snippet, we end each line with the addition symbol "+".
+
+```{r plot}
+ggplot(data=mers) + 
+  geom_bar(mapping=aes(x=epi.day)) + 
+  labs(x='Epidemic day', 
+       y='Case count', 
+       title='Global count of MERS cases by date of symptom onset', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+
+ggplot(data=mers) + 
+  geom_bar(mapping=aes(x=epi.day, fill=country)) + 
+  labs(x='Epidemic day', 
+       y='Case count', 
+       title='Global count of MERS cases by date of symptom onset', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+```
+
+#### Question: What happens if we don't use this convention (+ between functions)?
+
+Without the +, R treats the script as separate commands when they are needed together to create the plot. 
+
+
+### Exercise 1.2 
+
+Modify the epidemic curve using the argument position="fill".
+
+```{r}
+ggplot(data=mers) + 
+  geom_bar(mapping=aes(x=epi.day, fill=country), position='fill') + 
+  labs(x='Epidemic day', 
+       y='Case count', 
+       title='Global count of MERS cases by date of symptom onset', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+```
+
+
+
+
+
+#### Question: What does this plot show?
+
+Shows individual cases both with time attached and a country (time and space). 
+
+
+### Exercise 1.3 
+
+Another way to modify a bar plot is to change the coordinates. This can be done by "adding" coord_flip() and coord_polar() to the plot. 
+
+
+
+
+
+```{r}
+ggplot(data=mers) + 
+  geom_bar(mapping=aes(x=epi.day)) + 
+  labs(x='Epidemic day', 
+       y='Case count', 
+       title='Global count of MERS cases by date of symptom onset', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv') +
+  coord_flip()
+
+ggplot(data=mers) + 
+  geom_bar(mapping=aes(x=epi.day)) + 
+  labs(x='Epidemic day', 
+       y='Case count', 
+       title='Global count of MERS cases by date of symptom onset', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv') +
+  coord_polar()
+
+
+```
+
+#### Question: What does this plot show?
+
+Flips x and y axes and then shows x-axis as a 360degree axis. 
+
+
+
+
+```{r}
+mers$infectious.period <- mers$hospitalized2 - mers$onset2
+
+mers$infectious.period <- as.numeric(mers$infectious.period, units='days')
+
+ggplot(data=mers) +
+  geom_histogram(aes(x=infectious.period)) +
+  labs(x='Infectious period', 
+       y='Frequency', 
+       title='Distribution of calculated MERS infectious period', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+
+
+mers$infectious.period2 <- ifelse(mers$infectious.period<0, 0, mers$infectious.period)
+
+ggplot(data=mers) +
+  geom_histogram(aes(x=infectious.period2)) +
+  labs(x='Infectious period', 
+       y='Frequency', 
+       title='Distribution of calculated MERS infectious period (positive values only)', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+```
+
+
+### Exercise 1.4 
+
+Investigate the frequency of hospital-acquired infections of MERS.
+
+```{r}
+mers$HAI <- ifelse(mers$infectious.period<0, "HAI", "not HAI")
+table(mers$HAI)
+```
+
+```{r}
+ggplot(data=mers) +
+  geom_density(aes(x=infectious.period2)) +
+  labs(x='Infectious period', 
+       y='Frequency', 
+       title='Probability density for MERS infectious period (positive values only)', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+
+ggplot(data=mers) +
+  geom_area(stat='bin', aes(x=infectious.period2)) +
+  labs(x='Infectious period', 
+       y='Frequency', 
+       title='Area plot for MERS infectious period (positive values only)', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+```
+
+
+### Exercise 1.5 
+
+Use the infectious period data calculated in mers$infectious.period2 to experiment with other univariate plot types like geom_dotplot and geom_bar.
+
+
+```{r}
+ggplot(data=mers) +
+  geom_dotplot(aes(x=infectious.period2)) +
+  labs(x='Infectious period', 
+       y='Frequency', 
+       title='Dotplot for MERS infectious period (positive values only)', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+
+ggplot(data=mers) +
+  geom_bar(aes(x=infectious.period2)) +
+  labs(x='Infectious period', 
+       y='Frequency', 
+       title='Bar plot for MERS infectious period (positive values only)', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+```
+
+
+
+
+### Exercise 1.6 
+
+Use our corrected infectious period variable (infectious.period2) to study the change in the infectious period over the course of the MERS epidemic.
+
+```{r}
+ggplot(data=mers) +
+  geom_point(aes(x=onset2, y=infectious.period2)) +
+  labs(x='Date', 
+       y='Infectious period', 
+       title='Plot for MERS infectious period on date', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+
+ggplot(data=mers) +
+  geom_smooth(aes(x=onset2, y=infectious.period2)) +
+  labs(x='Date', 
+       y='Infectious period', 
+       title='Plot for MERS infectious period on date', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+
+```
+
+
+### Exercise 1.7 
+
+In data from many outbreaks it can be seen that there is a kind of societal learning. When the infection first emerges it is not quickly recognized, public health resources have not been mobilized, it is not known what symptoms are diagnostic, how to treat, etc. But, quickly, this information is collected and the outbreak is contained. Is there evidence of this kind of societal learning in the mers data? Add a curve fit using geom_smooth to explore this question. Hint: We solved using the loess method because the default smoother (gam) failed. 
+
+
+### Exercise 1.8 
+
+Plot infectious.period2 against time, as before, but this time add a separate smooth fit for each country.
+
+```{r}
+ggplot(data=mers) +
+  geom_point(aes(x=onset2, y=infectious.period2)) +
+  geom_smooth(aes(x=onset2, y=infectious.period2)) +
+  labs(x='Date', 
+       y='Infectious period', 
+       title='Plot for MERS infectious period on date', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv') +
+  facet_wrap(~country)
+
+```
+
+
+
+```{r}
+ggplot(data=mers, mapping=aes(x=epi.day, y=infectious.period2)) + 
+  geom_point(mapping=aes(color=country)) +
+  facet_wrap(~ country) +
+  scale_y_continuous(limits=c(0,50)) +
+  labs(x='Epidemic day',
+       y='Infectious period',
+       title='MERS infectious period (positive values only) over time', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+```
+
+
+
+
+```{r}
+ggplot(data=subset(mers, gender %in% c('M', 'F') & country %in% c('KSA', 'Oman', 'Iran', 'Jordan', 'Qatar', 'South Korea', 'UAE')), mapping=aes(x=epi.day, y=infectious.period2)) +
+  geom_point(mapping=aes(color=country)) + 
+  facet_grid(gender~country) + 
+  scale_y_continuous(limits=c(0,50)) +
+  labs(x='Epidemic day',
+       y='Infectious period',
+       title='MERS infectious period by gender and country', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+```
+
+
+
+
+### Exercise 1.9 
+
+Study variation in the case fatality rate (the fraction of cases that end in death) over time and across countries.
+
+```{r}
+mers$epi.month <- month(mers$onset2)
+mers$epi.year <- year(mers$onset2)
+
+
+mers$count <- 1 
+mers$death.indicator <- ifelse(mers$outcome=="fatal", 1, 0)
+
+cfr <- data.frame(
+cases.count = rowsum(mers$count, group=mers$epi.year),
+fatalities.count = rowsum(mers$death.indicator, group=mers$epi.year)
+)
+
+cfr$cfr <- cfr$fatalities.count / cfr$cases.count
+cfr$group <- rownames(cfr)
+
+
+
+cfr2 <- data.frame(
+cases.count = rowsum(mers$count, group=mers$country),
+fatalities.count = rowsum(mers$death.indicator, group=mers$country)
+)
+
+cfr2$cfr <- cfr2$fatalities.count / cfr2$cases.count
+cfr2$group <- rownames(cfr2)
+
+
+
+mers$cy <- paste0(mers$country, " ", mers$epi.year)
+
+cfr3 <- data.frame(
+cases.count = rowsum(mers$count, group=mers$cy),
+fatalities.count = rowsum(mers$death.indicator, group=mers$cy)
+)
+
+cfr3$cfr <- cfr3$fatalities.count / cfr3$cases.count
+cfr3$group <- rownames(cfr3)
+```
+
+
+```{r}
+ggplot(data=cfr) +
+  geom_point(mapping=aes(x=group, y=cfr)) +
+  labs(x="Year", 
+       y="Case Fatality Rate", 
+       title="Case Fatality Rates across time")
+
+ggplot(data=cfr2) +
+  geom_point(mapping=aes(x=group, y=cfr)) +
+  labs(x="Country", 
+       y="Case Fatality Rate", 
+       title="Case Fatality Rates across countries")
+
+ggplot(data=cfr3) +
+  geom_point(mapping=aes(x=group, y=cfr)) +
+  labs(x="Country Year", 
+       y="Case Fatality Rate", 
+       title="Case Fatality Rates across time by country")
+
+```
+
+
+
+
+### Exercise 1.10 
+
+Download and install the ggplot extension. Modify your plot with one or more new geoms. 
+
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+```{r}
+epi.curve <- ggplot(data=mers) +
+  geom_bar(mapping=aes(x=epi.day)) +
+  labs(x='Epidemic day',
+       y='Case count',
+       title='Global count of MERS cases by date of symptom onset', 
+       caption='Data from: https://github.com/rambaut/MERS-Cases/blob/gh-pages/data/cases.csv')
+ggplotly(epi.curve)
+```
+
+
+### Exercise 1.11 
+
+Make one of your case fatality plots an interactive graphic. 
+
+```{r}
+
+cfrs.plot <- ggplot(data=cfr3) +
+  geom_point(mapping=aes(x=group, y=cfr)) +
+  labs(x="Country Year", 
+       y="Case Fatality Rate", 
+       title="Case Fatality Rates across time by country")
+
+ggplotly(cfrs.plot)
+```
+
+
+
+
+
+
+
+
+
+
+## Programming
+
+### Exercise 1.12 
+
+Write a script to load the West Nile virus data and use ggplot to create a histogram for the total number of cases in each state in each year. Follow the format of the prototypical script advocated in the presentation: Header, Load Packages, Declare Functions, Load Data, Perform Analysis.
+
+```{r}
+wnv <- read.csv("https://raw.githubusercontent.com/jdrakephd/ideas-workshop/master/wnv.csv")
+
+ggplot(data=wnv) +
+  geom_histogram(mapping=aes(x=Total)) +
+  labs(x="WNV Case Counts", 
+       y="Frequency", 
+       title="Histogram of WNV Case Counts, Annual, State-specific", 
+       caption="Data from: https://raw.githubusercontent.com/jdrakephd/ideas-workshop/master/wnv.csv")
+```
+
+
+### Exercise 1.13 
+
+The state-level and case burden is evidently highly skewed. Plot a histogram for the logarithm of the number of cases. Do this two different ways.
+
+```{r}
+wnv$log.total <- log(wnv$Total)
+
+ggplot(data=wnv) +
+  geom_histogram(mapping=aes(x=log.total)) +
+  labs(x="WNV Case Counts, log transformed", 
+       y="Frequency", 
+       title="Histogram of log(WNV Case Counts), Annual, State-specific [Method 1]", 
+       caption="Data from: https://raw.githubusercontent.com/jdrakephd/ideas-workshop/master/wnv.csv")
+
+
+ggplot(data=wnv) +
+  geom_histogram(mapping=aes(x=log(Total))) +
+  labs(x="WNV Case Counts, log transformed", 
+       y="Frequency", 
+       title="Histogram of log(WNV Case Counts), Annual, State-specific [Method 2]", 
+       caption="Data from: https://raw.githubusercontent.com/jdrakephd/ideas-workshop/master/wnv.csv")
+```
+
+### Exercise 1.14 
+
+Use arithmetic operators to calculate the raw case fatality rate (CFR) in each state in each year. Plot a histogram of the calcated CFRs.
+
+```{r}
+wnv$cfr <- wnv$Fatal/wnv$Total
+
+ggplot(data=wnv) +
+  geom_histogram(mapping=aes(x=cfr)) +
+  labs(x="WNV Case Fatality Rate", 
+       y="Frequency", 
+       title="Histogram of WNV Case Fatality Rate, Annual, State-specific", 
+       caption="Data from: https://raw.githubusercontent.com/jdrakephd/ideas-workshop/master/wnv.csv")
+```
+
+
+
+
+
+### Exercise 1.15 
+
+Use arithmetic operators, logical operators, and the function sum to verify that the variable Total is simply the sum of the number of febrile cases, neuroinvasive cases, and other cases.
+
+
+```{r}
+if(sum({wnv$EncephMen + wnv$Fever + wnv$Other} != wnv$Total)==0){
+  print("Sum confirmed!")
+}else{"Sum not confirmed!"}
+```
+
+### Exercise 1.16 
+
+Use modular arithmetic to provide an annual case count for each state rounded (down) to the nearest dozen. Use modular arithmetic to extract the rounding errors associated with this calculate, then add the errors to obtain the total error.
+
+```{r}
+wnv$cc.dozens <- floor(wnv$Total/12)*12
+wnv$rounding.error <- wnv$Total-wnv$cc.dozens
+
+print(paste0("By rounding down to the nearest multiple of 12, there is a discrepancy of ", sum(wnv$rounding.error)," cases being lost."))
+```
+
+
+### Exercise 1.17 
+
+Write a function to calculate the mean and standard error (standard deviation divided by the square root of the sample size) of the neuroinvasive disease rate for all the states in a given list and given set of years. Follow the Google R style and remember to place the function near the top of your script. Use your function to calculate the average severe disease rate in California, Colorado, and New York.
+
+```{r}
+exfunc <- function(states){
+  .data <- wnv[wnv$State%in%states,]
+  .mean <- mean(.data$EncephMen/.data$Total)
+  .se <- sd(.data$EncephMen/.data$Total)/sqrt(nrow(.data))
+  
+  calcd <- cbind(.mean,.se)
+}
+
+test <- exfunc(states=c("California", "Colorado", "New York"))
+
+```
+
+
+
+
+```{r}
+severe.cases.proportion <- function(STATE, YEAR){
+  print(paste0("In ", STATE, " for the year ", YEAR, ", ", round(wnv[wnv$State%in%STATE & wnv$Year%in%YEAR,]$EncephMen/wnv[wnv$State==STATE & wnv$Year==YEAR,]$Total*100,2), "% of all WNV cases presented with neuroinvasive disease."))
+}
+
+severe.cases.proportion("Georgia", 2007)
+severe.cases.proportion("California", 2007)
+```
+
+
+
+```{r}
+sdr <- function(states, years){
+  .data <- wnv
+  .data$nidr <- .data$EncephMen/.data$Total
+  
+  # print(.data[{.data$State%in%states & .data$Year%in%years},c("State", "Year", "nidr")])
+  .values <- data.frame(State=c(NA), Mean.NIDR=c(NA), SE.NIDR=c(NA))
+  for (.i in 1:length(states)){
+    .n <- nrow(.data[.data$State==states[.i],])
+    .mean <- mean(.data[.data$State==states[.i],]$nidr)
+    .sd <- sd(.data[.data$State==states[.i],]$nidr)
+    .se <- .sd / sqrt(.n)
+    
+    print(paste0("The mean NIDR for ", states[.i], " in the given years is ", round(.mean, 3), " and the standard error is ", round(.se,3)))
+    .values[.i,"State"]<-states[.i]
+    .values[.i,"Mean.NIDR"]<-.mean
+    .values[.i,"SE.NIDR"]<-.se
+  }
+  rm(.i)
+  
+  values <- .values
+}
+
+testing <- sdr(states=c("California", "Colorado", "New York"), years=c(2002:2007))
+
+#ndr <- sdr(states=c("California", "Colorado", "New York"), years=c(2002:2007))
+```
+
+
+### Exercise 1.18 
+
+Use ggplot to show the neurovinvasive disease rate for these states as a bar graph with error bars to show the standard deviation.
+
+```{r}
+ggplot(data=testing, mapping=aes(x=State, y=Mean.NIDR))+
+  geom_bar(stat='identity') +
+  geom_errorbar(aes(ymin=Mean.NIDR-SE.NIDR, ymax=Mean.NIDR+SE.NIDR), size=.3, width=.2)
+
+```
+
+
+
+
+
+### Exercise 1.19 
+
+Use your function and ggplot to show the neurovinvasive disease rate for all states.
+
+```{r}
+testing2 <- sdr(states=levels(wnv$State), years=c(2002:2007))
+
+ggplot(data=testing2, mapping=aes(x=State, y=Mean.NIDR))+
+  geom_bar(stat='identity') +
+  geom_errorbar(aes(ymin=Mean.NIDR-SE.NIDR, ymax=Mean.NIDR+SE.NIDR), size=.3, width=.2)
+```
+
+### Exercise 1.20 
+
+Use pipes to produce the same plots without using your function.
+
+```{r}
+print('No.')
+```
+
+### Exercise 1.21 
+
+Choose a longitude to designate the "center" of the country. Use the function ifelse to assign each state to an "Eastern" region or a "Western" region.
+
+```{r}
+wnv$ew <- ifelse(wnv$Longitude>-98, "Eastern", "Western")
+```
+
+### Exercise 1.22 
+
+Analyse your data to compare case fatality rates in the Eastern vs. Weestern United States.
+
+```{r}
+t.test(wnv[wnv$ew=="Eastern",]$cfr, wnv[wnv$ew=="Western",]$cfr)
+```
+
+
+### Exercise 1.23 
+
+Is there evidence for a latitudinal gradient in case fatality rate? 
+
+```{r}
+wnv$ns <- ifelse(wnv$Latitude<39, "South", "North")
+
+t.test(wnv[wnv$ns=="South",]$cfr, wnv[wnv$ns=="North",]$cfr)
+```
+
+
+### Exercise 1.24 
+
+Loop over all the years in the WNV data set (1999-2007) and compute the following statistics: Total number of states reporting cases, total number of reported cases, total number of fatalities, and case fatality rate. Produce some plots to explore how these quantities change over and with respect to each other. Explain what you have learned or suspect based on these plots.
+
+
+```{r}
+years <- 1999:2007
+year.reports <- c()
+year.totals <- c()
+year.fatals <- c()
+year.cfrs <- c()
+
+for(i in years){
+  year.reports <- c(year.reports,nrow(wnv[wnv$Year==i,]))
+  year.totals <- c(year.totals, sum(wnv[wnv$Year==i,]$Total))
+  year.fatals <- c(year.fatals, sum(wnv[wnv$Year==i,]$Fatal))
+  year.cfrs <- c(year.cfrs, sum(wnv[wnv$Year==i,]$Total)/sum(wnv[wnv$Year==i,]$Fatal))
+}
+rm(i)
+
+data <- as.data.frame(cbind(years, year.reports, year.totals, year.fatals, year.cfrs))
+
+par(mfrow=c(2,2))
+for(i in 2:length(names(data))){
+  plot(data[,names(data)[i]]~data$years, xlab="Year", ylab=paste0(names(data)[i]))
+}
+```
+
+
+
+### Exercise 1.25 
+
+How does your choice of longitudinal breakpoint matter to the evidence for a geographic difference in case fatality rate? Combine conditional execution and looping to study the difference in case fatality rate over a range of breakpoints. What is the "best" longitude for separating case fatality rate in the East vs. West?
+
+```{r}
+longs <- -72:-110
+ps <- c()
+diffs <- c()
+
+for(i in 1:length(longs)){
+  .ew <- ifelse(wnv$Longitude>longs[i], "Eastern", "Western")
+
+  tts<-t.test(wnv[.ew=="Eastern",]$cfr, wnv[.ew=="Western",]$cfr)
+  ps <- c(ps, tts$p.value)
+  diffs <- c(diffs,as.numeric(diff(tts$estimate)))
+}
+
+data <- as.data.frame(cbind(longs, ps, diffs))
+print(data)
+
+plot(data$diffs~data$longs, xlab="Longitude Dividing Line", ylab="Eastern CFR - Western CFR")
+```
+
+### Exercise 1.26 
+
+We may interpret raw case fatality rate (i.e. ratio of the number of deaths, x, to number of infections, n) as a realization from a binomial process with n trials and x "successes" generated by an unknown rate parameter p. This p may be the quantity truly of interest (for instance, if we wish to ask if the case fatality rate in California is significantly different from the case fatality rate in Colorado. In R, the estimated rate and its confidence interval can be obtained using the function prop.test for testing equal proportions. Use the help to determine the proper usage of prop.test and calculate confidence intervals for the case fatality rates in all states for which there have been reported cases of WNV.
+
+
+
+```{r}
+Colorado <- wnv[wnv$State=="Colorado",c("State", "Fatal", "Total")]
+CO.fatals <- sum(Colorado$Fatal)
+CO.totals <- sum(Colorado$Total)
+California <- wnv[wnv$State=="California",c("State", "Fatal", "Total")]
+CA.fatals <- sum(California$Fatal)
+CA.totals <- sum(California$Total)
+
+
+data <- as.data.frame(t(cbind(rbind(CO.fatals,CO.totals),rbind(CA.fatals,CA.totals))))
+names(data) <- c("Fatals", "Totals")
+data$State <- c("CO", "CA")
+
+prop.test(x=data$Fatals, n=data$Totals)
+
+
+
+
+
+
+Colorado <- wnv[wnv$State=="Colorado",c("State", "Fatal", "Total")]
+CO.fatals <- sum(Colorado$Fatal)
+CO.totals <- sum(Colorado$Total)
+California <- wnv[wnv$State=="California",c("State", "Fatal", "Total")]
+CA.fatals <- sum(California$Fatal)
+CA.totals <- sum(California$Total)
+Georgia <- wnv[wnv$State=="Georgia",c("State", "Fatal", "Total")]
+GA.fatals <- sum(Georgia$Fatal)
+GA.totals <- sum(Georgia$Total)
+
+data <- as.data.frame(t(cbind(rbind(CO.fatals,CO.totals),rbind(CA.fatals,CA.totals),rbind(GA.fatals,GA.totals))))
+names(data) <- c("Fatals", "Totals")
+data$State <- c("CO", "CA", "GA")
+
+prop.test(x=data$Fatals, n=data$Totals)
+```
+
+
+
+
+```{r}
+wnv$State1 <- relevel(wnv$State, ref="Colorado")
+summary(glm(cbind(wnv$Fatal, {wnv$Total-wnv$Fatal})~wnv$State1, family=binomial))
+```
+
+### Exercise 1.27 
+
+The "See Also" section of the help for prop.test states that a different function might be useful for an exact test of our hypotheses. Use the help to identify what this function is, learn how to use it, and compare the differences.
+
+
+
+# Module 2
+
+
+```{r packages2, message=FALSE, warning=FALSE, error=FALSE}
+if(require(tidyverse)){library(tidyverse)}else{install.packages("tidyverse");library(tidyverse)}
+if(require(magrittr)){library(magrittr)}else{install.packages("magrittr");library(magrittr)}
+if(require(dplyr)){library(dplyr)}else{install.packages("dplyr");library(dplyr)}
+if(require(stringr)){library(stringr)}else{install.packages("stringr");library(stringr)}
+if(require(GGally)){library(GGally)}else{install.packages("GGally");library(GGally)}
+if(require(maptools)){library(maptools)}else{install.packages("maptools");library(maptools)}
+if(require(ggmap)){library(ggmap)}else{install.packages("ggmap");library(ggmap)}
+if(require(maps)){library(maps)}else{install.packages("maps");library(maps)}
+```
+
+## Wrangling
+
+
+### Task 1
+
+Read in all three csv files as tibble data frames. For consistency with these notes, we'll assign their dataframes to be called "ld", "pop", and "prism", respectively. 
+
+```{r, message=FALSE, warning=FALSE, error=FALSE}
+ld <- read_csv("./Data/lyme.csv")
+pop <- read_csv("./Data/pop.csv")
+prism <- read_csv("./Data/climate.csv")
+```
+
+### Task 2
+
+By inspecting the 'pop' data, and talking with your neighbors and instructors, articulate in which way(s) these data fail to conform to the tidy data format?
+
+
+
+### Task 3 
+
+Before running the code, read it to see if you can work out or guess what each line is doing. Before running a line of code, remind yourself of the current format of pop by typing it's name in the console window and hitting return. Then run each line, one by one, and after each line has been executed, look again at pop to see what it did. Once you're clear about what each line is doing, add a comment line above each code line
+to remind you, in your own words, what the code does.
+
+```{r}
+pop %<>% select(fips,starts_with("pop2"))
+pop %<>% gather(starts_with("pop2"),key="str_year",value="size") %>% na.omit
+pop %<>% mutate(year=str_replace_all(str_year,"pop",""))
+pop %<>% mutate(year=as.integer(year))
+#pop %<>% mutate(fips=str_replace_all(fips,"^0",""))
+pop %<>% mutate(fips=as.integer(fips)) %>% select(-str_year)
+```
+
+
+### Task 4
+
+Write a code chunk to convert the Lyme disease data to tidy data format. 
+
+
+```{r}
+ld$FIPS.county <- ifelse(ld$CTYCODE<10, paste0("00", ld$CTYCODE), 
+                          ifelse(ld$CTYCODE<100, paste0("0", ld$CTYCODE), paste0(ld$CTYCODE)))
+ld$fips <- paste0(ld$STCODE, ld$FIPS.county)
+
+
+
+ld %<>% select(state=STNAME, county=CTYNAME, fips,starts_with("Cases2"))
+ld %<>% gather(starts_with("Cases2"),key="str_year",value="count") %>% na.omit
+ld %<>% mutate(year=str_replace_all(str_year,"Cases",""))
+ld %<>% mutate(year=as.integer(year))
+#ld %<>% mutate(fips=str_replace_all(fips,"^0",""))
+ld %<>% mutate(fips=as.integer(fips)) %>% select(-str_year)
+```
+
+
+### Task 5
+
+Join the Lyme disease data frame and PRISM data frame together to form a new data frame, and in such a way that it retains county-year combinations for which we have both disease and climate data.
+
+```{r}
+data <- inner_join(ld, prism)
+```
+
+
+
+### Task 6
+
+Write a line of code to additionally combine the demographic data with the Lyme disease and climate data.
+
+```{r}
+data <- left_join(data, pop)
+```
+
+
+### Task 7
+
+Write two lines of code that create two new data frames: (1) to determine how many cases of Lyme disease were reported each year, (2) the average number of cases in each state - averaged across county and year. What was the worst year? Which three states have been most impacted on average?
+
+```{r}
+annual.reports <- rowsum(data$count, group=data$year)
+
+data %>% group_by(year) %>% summarize(Total.cases = sum(count)) %>% arrange(desc(Total.cases))
+
+
+
+data %>% group_by(state) %>% summarize(Average.cases = mean(count)) %>% arrange(desc(Average.cases))
+```
+
+
+
+### Task 8
+
+use save to create an Rda file of the data frame and use write_csv to create a csv file of the same (remember to try ?save and ?write_csv in the console if you're not sure how these functions work).
+
+
+```{r, eval=FALSE}
+save(data, file="./Data/lymedata_clean.rdata")
+
+write.csv(data, file="./Data/lymedata_clean.csv")
+
+```
+
+
+
+### Task 9
+
+Add annotations to the following lines of code with comment lines to explain what they are achieving. Note: in the code line with "group_by(ld.prism.pop)" you need to replace the data frame in parentheses with the name of your data frame in which you combined Lyme disease, climate and demography data (Task 6)
+
+
+```{r}
+county_map <- map_data("county") # geo-data for US counties
+state_map <- map_data("state") # geo-data for US states
+ag.fips <- group_by(data,fips) # order by fips
+ld.16y<-summarize(ag.fips,all.cases=sum(count)) # total case counts per county across all years
+ld.16y<-left_join(select(data,c(state,county,fips)),ld.16y) # put total case counts with fips and state and county identifiers
+ld.16y<-distinct(ld.16y) # remove duplicates?
+ld.16y %<>% rename(region=state,subregion=county) # rename vars
+ld.16y$subregion<-str_replace_all(ld.16y$subregion," County","") # create var and strip following string
+ld.16y$region<-tolower(ld.16y$region) # lowercase
+ld.16y$subregion<-tolower(ld.16y$subregion) # lowercase
+ld.16y$subregion<-str_replace_all(ld.16y$subregion," parish","") # drop parish suffix
+ld.16y %<>% mutate(log10cases=log10(1+all.cases)) # log transformation with continuity correction
+map.ld.16y<-left_join(county_map,ld.16y) # case data with geo-data
+
+
+
+ggplot(map.ld.16y)+
+  geom_polygon(aes(long,lat,group=group,fill=log10cases),
+               color="gray",lwd=0.2) +
+scale_fill_gradientn(colours=rev(heat.colors(10))) # map making
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+## Modeling
+
+
+### Task 1
+
+Using either read_csv (note: the underscore version, not read.csv) or load, import the data set you put together in the module on 'Data wrangling in R'
+
+
+```{r}
+load("./Data/lymedata_clean.rdata")
+```
+
+
+### Task 2
+
+Use the ggpairs function to obtain a 4x4 summary plot of precipitation (prcp), average temperature (avtemp), population size (size), number of Lyme disease cases (cases). Note: it may take several seconds for this plot to appear as there are nearly 50,000 data points.
+
+
+```{r}
+ggpairs(data, columns = c(4,6:8))
+
+
+```
+
+
+### Task 3
+
+Create two new columns for log10(size) and log10(cases+1) and substitute these for the original size and cases supplied when you recreate the ggpairs plot. Why do we add 1 to the number of cases?
+
+```{r}
+data %<>% mutate(log10.size=log10(size), log10.cases=log10(count+1))
+
+ggpairs(data, columns = c(6:7,9:10))
+```
+
+
+### Task 4
+
+Using set.seed(222) for reproducibility, create a new data frame to be a random sample (n=100 rows) of the full data frame and plot precipitation (x-axis) vs average temperature (y-axis).
+
+
+```{r}
+set.seed(222)
+
+sample_n(data, 100) %>% ggplot()+geom_point(aes(y=avtemp,x=prcp))
+```
+
+
+
+
+### Task 5
+
+Add the best straight line to the plot using geom_smooth.
+```{r}
+set.seed(222)
+sample_n(data, 100) %>% ggplot()+geom_point(aes(y=avtemp,x=prcp))+geom_smooth(aes(y=avtemp, x=prcp), method=lm)
+
+```
+
+### Task 6
+
+Create a linear model (lm) object with a call like myModel <- lm(y ~ x, data = myData) for the subsetted data, where y=avtemp and x=prcp. In addition, view the summary with a call along the lines of summary(myModel)
+
+
+```{r}
+summary(lm(avtemp~prcp, data=data))
+
+```
+
+
+
+### Task 7
+
+What is the slope of the line you plotted in Task 5, and is the slope significantly different from 0 (p<0.05)?
+
+The slope of the line is `r round(summary(lm(avtemp~prcp, data=data))$coefficients[2,1],4)` and, yes it is statistically significantly different from 0 (t=`r round(summary(lm(avtemp~prcp, data=data))$coefficients[2,3],2)`, p=`r summary(lm(avtemp~prcp, data=data))$coefficients[2,4]`).
+
+
+### Task 8
+
+Write a single line of code to generate a ggplot of total population size by year.
+
+```{r}
+
+data %>% group_by(year) %>% summarize(Total.pop = sum(size)) %>% ggplot()+geom_line(aes(y=Total.pop, x=year))
+
+
+
+data %>% group_by(year) %>% summarize(Total.pop = sum(size, na.rm=TRUE)) %>% ggplot()+geom_line(aes(y=Total.pop, x=year))
+
+```
+
+### Task 9
+
+Create a data frame called "by_state" from the main data frame, that groups by state, and inspect it.
+
+```{r}
+by_state <- data %>% group_by(state)
+```
+
+
+
+### Task 10
+
+Next, update this new data frame so that it is nested (simply pass it to nest). Again, inspect the data frame by typing its name in the console so see how things changed.
+
+```{r}
+by_state %<>% nest()
+```
+
+
+
+### Task 11
+
+Display the Georgia data in the console window.
+
+```{r}
+by_state$data[[10]]
+
+```
+
+### Task 12
+
+Write a function that takes a data frame as its argument and returns a linear model object that predicts size by year.
+
+```{r}
+sby <- function(data){
+  lm(size~year, data)
+}
+```
+
+
+### Task 13
+
+Add a column to the by_state dataframe, where each row (state) has its own model object.
+
+```{r}
+
+models <- list()
+
+for(i in 1:nrow(by_state)){
+models[[i]] <- sby(by_state$data[[i]])
+}
+
+by_state$models <- models
+
+
+#by_state$mods <- purrr::map(by_state$data, sby)
+```
+
+
+
+### Task 14
+
+Run these commands and inspect "resids". What is the structure of "resids"?
+
+```{r}
+by_state$residuals <- purrr::map(by_state$models, residuals)
+```
+
+
+
+### Task 15
+
+Write a function that accepts an object of the type in the resids list, and returns a sum of the absolute values, i.e. ignoring sign: abs(3)+abs(-2)=5. Use the function to add a column called totalResid to by_state that provides the total size of residuals summed over counties and years.
+
+```{r}
+resid.sum <- function(raw.resids){
+  sum(abs(raw.resids))
+}
+
+by_state$residual.sum <- purrr::map(by_state$residuals, resid.sum)
+```
+
+
+### Task 16
+
+Write a function that accepts a linear model and returns the slope (model M has slope M$coefficients[2]) and then use this function to create a new column called slope in the by_state data frame, that is the slope for each state.
+
+```{r}
+get.slope <- function(model){
+  summary(model)$coefficients[2]
+}
+
+by_state$slope <- purrr::map(by_state$models, get.slope)
+```
+
+
+### Task 17
+
+Plot the growth rate (slope value) for all states.
+
+```{r}
+plot(y=unlist(by_state$slope),x=as.factor(unlist(by_state$state)))
+
+ggplot(data=by_state, mapping=aes(x=as.factor(unlist(state)), y=unlist(slope)))+geom_point()+theme(axis.text.x=element_text(angle=90, hjust=1))
+
+```
+
+
+### Task 18
+
+Plot the total resisduals for all states.
+```{r}
+plot(y=unlist(by_state$residual.sum),x=as.factor(unlist(by_state$state)))
+```
+
+### Task 19
+
+Repeat Tasks 9 and 10 using a different data frame name, by_state2.
+
+```{r}
+by_state2 <- data %>% group_by(state)
+
+by_state2 %<>% nest()
+```
+
+
+### Task 20
+
+Write a function that accepts an element of the by_state2$data list-column and returns the spearman correlation coefficient between Lyme disease cases and precipitation
+
+
+```{r, warning=FALSE}
+correlate.spearman <- function(.data){
+  cor.test(.data$count, .data$prcp, method="spearman")$estimate
+}
+
+
+by_state2$spcc <- purrr::map(by_state2$data, correlate.spearman)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Module 3
+
+## Project management
+
+
+### Exercise 1
+
+Copy the MERS data file cases.csv and paste it into your working directory.
+
+
+### Exercise 2 
+
+Create a new script following the prototype we introduced. Your script should load the MERS data and make a plot.
+
+
+
+
+### Exercise 3 
+
+To commit a change, navigate to the "Git" tab in the top right explorer window. You will see a list of files in your work directory. Select the files that need to be pushed to Github and click on "Commit". A dialog box will open. In the top right there is an editing window where you can register a comment describing the nature of the commit.
+
+### Exercise 4 
+
+Once you have committed one or more changes (and documented with comments), you need to push the changes to the archived version. To do this, click on "Push". You will need to enter your Github credentials in the dialog box that pops up. Now refresh the website for your project. The latest versions of your files should appear.
+
+
+
+
+### Exercise 5 
+
+Create a basic R Markdown document. Go to File -> New File -> R Markdown. Enter a title and author into the dialog box. Select the desired default output format. Save the resulting, automatically generated file. To compile the document, click on "Knit" in the R Studio editor. Study the code and the resulting report.
+
+
+
+
+
+### Exercise 6 
+
+Visit the R Markdown website and look around. Especially, read through the Authoring Basics. 
+
+
+
+### Exercise 7 
+
+
+Borrowing from your earlier exercises, prepare an analysis of the WNV or MERS data as a reproducible document using R/Markdown. Compile to a pdf (if your desktop in class is not compiling in PDF compile in HTML.
+
+
+
+### Exercise 8 
+
+Add an interactive plotly graph to your reproducible document. Compile to HTML.
+
+
+
+
+```{r}
+source("mers_plot.R")
+```
+
+
+# FIN WORKSHOP 1
+
+
+
+
