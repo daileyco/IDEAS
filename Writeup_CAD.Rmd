@@ -26,7 +26,7 @@ if(require(plotly)){library(plotly)}else{install.packages("plotly");library(plot
 ## Data Visualization
 
 ```{r import}
-mers <- read.csv("./Data/cases.csv")
+mers <- read.csv("./Workshop I/Data/cases.csv")
 ```
 
 
@@ -748,9 +748,9 @@ if(require(maps)){library(maps)}else{install.packages("maps");library(maps)}
 Read in all three csv files as tibble data frames. For consistency with these notes, we'll assign their dataframes to be called "ld", "pop", and "prism", respectively. 
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE}
-ld <- read_csv("./Data/lyme.csv")
-pop <- read_csv("./Data/pop.csv")
-prism <- read_csv("./Data/climate.csv")
+ld <- read_csv("./Workshop I/Data/lyme.csv")
+pop <- read_csv("./Workshop I/Data/pop.csv")
+prism <- read_csv("./Workshop I/Data/climate.csv")
 ```
 
 ### Task 2
@@ -836,9 +836,9 @@ use save to create an Rda file of the data frame and use write_csv to create a c
 
 
 ```{r, eval=FALSE}
-save(data, file="./Data/lymedata_clean.rdata")
+save(data, file="./Workshop I/Data/lymedata_clean.rdata")
 
-write.csv(data, file="./Data/lymedata_clean.csv")
+write.csv(data, file="./Workshop I/Data/lymedata_clean.csv")
 
 ```
 
@@ -893,7 +893,7 @@ Using either read_csv (note: the underscore version, not read.csv) or load, impo
 
 
 ```{r}
-load("./Data/lymedata_clean.rdata")
+load("./Workshop I/Data/lymedata_clean.rdata")
 ```
 
 
@@ -1186,11 +1186,6 @@ Borrowing from your earlier exercises, prepare an analysis of the WNV or MERS da
 Add an interactive plotly graph to your reproducible document. Compile to HTML.
 
 
-
-
-```{r}
-source("mers_plot.R")
-```
 
 
 # FIN WORKSHOP 1
