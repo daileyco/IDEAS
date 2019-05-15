@@ -10,7 +10,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache=FALSE)
 ```
 
 
@@ -1188,8 +1188,9 @@ Add an interactive plotly graph to your reproducible document. Compile to HTML.
 
 
 
-
-
+```{r}
+source("mers_plot.R")
+```
 
 
 
