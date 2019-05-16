@@ -4,6 +4,7 @@ author: "Cody Dailey"
 date: "May 13, 2019"
 output: 
   html_document:
+    keep_md: true
     toc: true
     toc_float: true
     code_folding: hide
@@ -1373,6 +1374,1136 @@ par(op)                                                     #re-set graphical pa
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Stability 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Control
+
+### Pulsed Vaccination
+
+```{r}
+if(require(deSolve)){library(deSolve)}else{install.packages("deSolve");library(deSolve)}
+
+sir.model.open <- function (t, x, params) {    #here we begin a function with three arguments
+  S <- x[1]                               #create local variable S, the first element of x
+  I <- x[2]                               #create local variable I
+  R <- x[3]                               #create local variable R
+  with(                                   #we can simplify code using "with"
+       as.list(params),                   #this argument to "with" lets us use the variable names
+       {                                  #the system of rate equations
+         dS <- mu*(S+I+R) - beta*S*I - mu*S
+         dI <- beta*S*I - gamma*I - mu*I
+         dR <- gamma*I - mu*R
+         dx <- c(dS,dI,dR)                #combine results into a single vector dx
+         list(dx)                         #return result as a list
+       }
+       )
+}
+
+
+###################################################
+### code chunk number 2: parameters
+###################################################
+R0 <- 10
+N <-  1					                       #population size
+mu <- 0.02                             #per capita birth/death rate
+gamma <- 365/10  			                 #recovery rate (in years)
+beta <- R0*(gamma+mu)/N 	             #transmission rate
+xstart <- c(S=0.2, I=0.001, R=1-0.2-0.001)	 #initial conditions, must sum to one
+Tmax <- 120                            #integrate for 200 years after transients
+params <- c(beta=beta, gamma=gamma, mu=mu)           #parameter vector
+tau <- 0.1                             #size of time step
+times <- seq(0, Tmax, by=tau)          #function seq returns a sequence
+
+
+###################################################
+### code chunk number 3: pulsed-vaccination.rnw:113-114
+###################################################
+out <- ode(xstart,times,sir.model.open,params, method='ode45', rtol=1e-7)  
+
+
+###################################################
+### code chunk number 4: pulsed-vaccination.rnw:119-124
+###################################################
+op <- par(fig=c(0,0.5,0,1),mar=c(4,4,1,1))                      #set graphical parameters
+plot(I~time,data=out, type='l', lwd=2)                          #plot the I variable against time
+par(fig=c(0.5,1,0,1),mar=c(4,1,1,1),new=T)                      #re-set graphical parameters
+plot(I~S,data=out,log='xy',yaxt='n',xlab='S', type='l', lwd=2)  #plot phase portrait
+par(op)                                                         #re-set graphical parameters
+
+
+###################################################
+### code chunk number 5: reset-parameters
+###################################################
+xstart <- out[which(out[,1]==50),2:4]
+
+
+###################################################
+### code chunk number 6: new-parameters
+###################################################
+pv <- 0.1                     # fraction of susceptibles vaccomated
+Tv <- 4                       # number of years between pulses
+vacc.events <- floor(Tmax/Tv) # number of pulses in Tmax years
+
+
+###################################################
+### code chunk number 7: dataframe
+###################################################
+data <- data.frame(S=out[which(out[,1]==50),2],
+                   I=out[which(out[,1]==50),3],
+                   R=out[which(out[,1]==50),4])
+
+
+###################################################
+### code chunk number 8: pulsed-vaccination.rnw:155-162
+###################################################
+for(i in 1:vacc.events){
+  out <- ode(xstart, seq(tau, Tv, by=tau), sir.model.open, params, method='ode45', rtol=1e-7)
+  xstart <- out[dim(out)[1],2:4]        # reset initial condition
+  xstart[1] <- (1-pv)*(tail(out,1)[2])  # vaccinate susceptibles
+  xstart[3] <- xstart[3]+(pv)*(tail(out,1)[2])  # move to recovered class
+  data <- rbind(data,out[,2:4])         # store result
+}
+
+
+###################################################
+### code chunk number 9: plot-vax
+###################################################
+data$time <- seq(50, Tmax+50, by=tau)
+par(mar=c(5,4,4,4)+0.1)
+plot(data$time[1:500], data$I[1:500], type='l', xlab='Time', ylab='', col='red', axes=FALSE)
+axis(2, col.axis='red')
+mtext(side=2, line=2.5, 'Infected', col='red')
+box()
+axis(1)
+par(new=TRUE)
+plot(data$time[1:500], data$S[1:500], type='l', xlab='', ylab='', axes=FALSE, col='black')
+axis(4)
+mtext(side=4, line=2.5, 'Susceptibles')
+
+
+
+```
+
+
+#### Exercise 1
+
+Why might this periodicity be of interest? What might be the consequences of "peaks" and troughs" for public health?
+
+Structured implementation, logistics easier, finite resources
+A trough could be an extinction after which no further oscillations are possible.
+
+#### Exercise 2
+
+By modifying the value of pv, see if you can locate the vaccination threshold. Does this agree with the analytically predicted threshold?
+
+```{r}
+ex2 <- function(.pvs){
+
+sir.model.open <- function (t, x, params) {    #here we begin a function with three arguments
+  S <- x[1]                               #create local variable S, the first element of x
+  I <- x[2]                               #create local variable I
+  R <- x[3]                               #create local variable R
+  with(                                   #we can simplify code using "with"
+       as.list(params),                   #this argument to "with" lets us use the variable names
+       {                                  #the system of rate equations
+         dS <- mu*(S+I+R) - beta*S*I - mu*S
+         dI <- beta*S*I - gamma*I - mu*I
+         dR <- gamma*I - mu*R
+         dx <- c(dS,dI,dR)                #combine results into a single vector dx
+         list(dx)                         #return result as a list
+       }
+       )
+}
+
+
+###################################################
+### code chunk number 2: parameters
+###################################################
+R0 <- 10
+N <-  1					                       #population size
+mu <- 0.02                             #per capita birth/death rate
+gamma <- 365/10  			                 #recovery rate (in years)
+beta <- R0*(gamma+mu)/N 	             #transmission rate
+xstart <- c(S=0.2, I=0.001, R=1-0.2-0.001)	 #initial conditions, must sum to one
+Tmax <- 120                            #integrate for 200 years after transients
+params <- c(beta=beta, gamma=gamma, mu=mu)           #parameter vector
+tau <- 0.1                             #size of time step
+times <- seq(0, Tmax, by=tau)          #function seq returns a sequence
+
+
+###################################################
+### code chunk number 3: pulsed-vaccination.rnw:113-114
+###################################################
+out <- ode(xstart,times,sir.model.open,params, method='ode45', rtol=1e-7)  
+
+# 
+# ###################################################
+# ### code chunk number 4: pulsed-vaccination.rnw:119-124
+# ###################################################
+# op <- par(fig=c(0,0.5,0,1),mar=c(4,4,1,1))                      #set graphical parameters
+# plot(I~time,data=out, type='l', lwd=2)                          #plot the I variable against time
+# par(fig=c(0.5,1,0,1),mar=c(4,1,1,1),new=T)                      #re-set graphical parameters
+# plot(I~S,data=out,log='xy',yaxt='n',xlab='S', type='l', lwd=2)  #plot phase portrait
+# par(op)                                                         #re-set graphical parameters
+
+
+###################################################
+### code chunk number 5: reset-parameters
+###################################################
+xstart <- out[which(out[,1]==50),2:4]
+
+
+###################################################
+### code chunk number 6: new-parameters
+###################################################
+pv <- .pvs                    # fraction of susceptibles vaccomated
+Tv <- 4                       # number of years between pulses
+vacc.events <- floor(Tmax/Tv) # number of pulses in Tmax years
+
+
+###################################################
+### code chunk number 7: dataframe
+###################################################
+data <- data.frame(S=out[which(out[,1]==50),2],
+                   I=out[which(out[,1]==50),3],
+                   R=out[which(out[,1]==50),4])
+
+
+###################################################
+### code chunk number 8: pulsed-vaccination.rnw:155-162
+###################################################
+for(i in 1:vacc.events){
+  out <- ode(xstart, seq(tau, Tv, by=tau), sir.model.open, params, method='ode45', rtol=1e-7)
+  xstart <- out[dim(out)[1],2:4]        # reset initial condition
+  xstart[1] <- (1-pv)*(tail(out,1)[2])  # vaccinate susceptibles
+  xstart[3] <- xstart[3]+(pv)*(tail(out,1)[2])  # move to recovered class
+  data <- rbind(data,out[,2:4])         # store result
+}
+
+
+###################################################
+### code chunk number 9: plot-vax
+###################################################
+data$time <- seq(50, Tmax+50, by=tau)
+par(mar=c(5,4,4,4)+0.1)
+plot(data$time[1:500], data$I[1:500], type='l', xlab='Time', ylab='', col='red', axes=FALSE)
+axis(2, col.axis='red')
+mtext(side=2, line=2.5, 'Infected', col='red')
+box()
+axis(1)
+par(new=TRUE)
+plot(data$time[1:500], data$S[1:500], type='l', xlab='', ylab='', axes=FALSE, col='black')
+axis(4)
+mtext(side=4, line=2.5, 'Susceptibles')
+
+}
+
+
+sample.pvs <- seq(0.1,0.95,0.05)
+
+
+for(i in 1:length(sample.pvs)){
+  ex2(sample.pvs[i])
+}
+```
+
+
+
+#### Exercise 3
+
+One thing we might be interested in knowing is how our vaccination strategy affects mean disease prevalance. Devise a strategy to study this question and produce a plot illustrating the result.
+```{r}
+ex2 <- function(.pvs){
+
+sir.model.open <- function (t, x, params) {    #here we begin a function with three arguments
+  S <- x[1]                               #create local variable S, the first element of x
+  I <- x[2]                               #create local variable I
+  R <- x[3]                               #create local variable R
+  with(                                   #we can simplify code using "with"
+       as.list(params),                   #this argument to "with" lets us use the variable names
+       {                                  #the system of rate equations
+         dS <- mu*(S+I+R) - beta*S*I - mu*S
+         dI <- beta*S*I - gamma*I - mu*I
+         dR <- gamma*I - mu*R
+         dx <- c(dS,dI,dR)                #combine results into a single vector dx
+         list(dx)                         #return result as a list
+       }
+       )
+}
+
+
+###################################################
+### code chunk number 2: parameters
+###################################################
+R0 <- 10
+N <-  1					                       #population size
+mu <- 0.02                             #per capita birth/death rate
+gamma <- 365/10  			                 #recovery rate (in years)
+beta <- R0*(gamma+mu)/N 	             #transmission rate
+xstart <- c(S=0.2, I=0.001, R=1-0.2-0.001)	 #initial conditions, must sum to one
+Tmax <- 120                            #integrate for 200 years after transients
+params <- c(beta=beta, gamma=gamma, mu=mu)           #parameter vector
+tau <- 0.1                             #size of time step
+times <- seq(0, Tmax, by=tau)          #function seq returns a sequence
+
+
+###################################################
+### code chunk number 3: pulsed-vaccination.rnw:113-114
+###################################################
+out <- ode(xstart,times,sir.model.open,params, method='ode45', rtol=1e-7)  
+
+# 
+# ###################################################
+# ### code chunk number 4: pulsed-vaccination.rnw:119-124
+# ###################################################
+# op <- par(fig=c(0,0.5,0,1),mar=c(4,4,1,1))                      #set graphical parameters
+# plot(I~time,data=out, type='l', lwd=2)                          #plot the I variable against time
+# par(fig=c(0.5,1,0,1),mar=c(4,1,1,1),new=T)                      #re-set graphical parameters
+# plot(I~S,data=out,log='xy',yaxt='n',xlab='S', type='l', lwd=2)  #plot phase portrait
+# par(op)                                                         #re-set graphical parameters
+
+
+###################################################
+### code chunk number 5: reset-parameters
+###################################################
+xstart <- out[which(out[,1]==50),2:4]
+
+
+###################################################
+### code chunk number 6: new-parameters
+###################################################
+pv <- .pvs                    # fraction of susceptibles vaccomated
+Tv <- 4                       # number of years between pulses
+vacc.events <- floor(Tmax/Tv) # number of pulses in Tmax years
+
+
+###################################################
+### code chunk number 7: dataframe
+###################################################
+data <- data.frame(S=out[which(out[,1]==50),2],
+                   I=out[which(out[,1]==50),3],
+                   R=out[which(out[,1]==50),4])
+
+
+###################################################
+### code chunk number 8: pulsed-vaccination.rnw:155-162
+###################################################
+for(i in 1:vacc.events){
+  out <- ode(xstart, seq(tau, Tv, by=tau), sir.model.open, params, method='ode45', rtol=1e-7)
+  xstart <- out[dim(out)[1],2:4]        # reset initial condition
+  xstart[1] <- (1-pv)*(tail(out,1)[2])  # vaccinate susceptibles
+  xstart[3] <- xstart[3]+(pv)*(tail(out,1)[2])  # move to recovered class
+  data <- rbind(data,out[,2:4])         # store result
+}
+
+
+# ###################################################
+# ### code chunk number 9: plot-vax
+# ###################################################
+ data$time <- seq(50, Tmax+50, by=tau)
+# par(mar=c(5,4,4,4)+0.1)
+# plot(data$time[1:500], data$I[1:500], type='l', xlab='Time', ylab='', col='red', axes=FALSE)
+# axis(2, col.axis='red')
+# mtext(side=2, line=2.5, 'Infected', col='red')
+# box()
+# axis(1)
+# par(new=TRUE)
+# plot(data$time[1:500], data$S[1:500], type='l', xlab='', ylab='', axes=FALSE, col='black')
+# axis(4)
+# mtext(side=4, line=2.5, 'Susceptibles')
+
+mean.prevalence <- mean(data$I)
+
+}
+
+
+sample.pvs <- seq(0.1,0.95,0.05)
+
+mean.prevs <- c()
+
+for(i in 1:length(sample.pvs)){
+  mean.prevs[i]<- ex2(sample.pvs[i])
+}
+
+plot(x=sample.pvs, y=mean.prevs)
+```
+
+
+#### Exercise 4
+
+By thinking about analytical results shown in class, explain what the crossing of the red and green lines means. Is this conclusion confirmed by the blue line?
+
+
+
+
+#### Exercise 5
+
+Can you reproduce this figure?
+
+
+```{r}
+ex2 <- function(.pvs){
+
+sir.model.open <- function (t, x, params) {
+  S <- x[1]                              
+  I <- x[2]                              
+  R <- x[3]                             
+  with(                                
+       as.list(params),              
+       {                               
+         dS <- mu*(S+I+R) - beta*S*I - mu*S
+         dI <- beta*S*I - gamma*I - mu*I
+         dR <- gamma*I - mu*R
+         dx <- c(dS,dI,dR)           
+         list(dx)                  
+       }
+       )
+}
+
+
+R0 <- 10
+N <-  1					              
+mu <- 0.02                      
+gamma <- 365/10  			               
+beta <- R0*(gamma+mu)/N 	           
+xstart <- c(S=0.2, I=0.001, R=1-0.2-0.001)	
+Tmax <- 100                         
+params <- c(beta=beta, gamma=gamma, mu=mu)       
+tau <- 0.1                           
+times <- seq(0, Tmax, by=tau)        
+
+
+out <- ode(xstart,times,sir.model.open,params, method='ode45', rtol=1e-7)  
+
+
+
+xstart <- out[which(out[,1]==50),2:4]
+
+
+pv <- .pvs                   
+Tv <- 4                      
+vacc.events <- floor(Tmax/Tv) 
+
+
+data <- data.frame(S=out[which(out[,1]==50),2],
+                   I=out[which(out[,1]==50),3],
+                   R=out[which(out[,1]==50),4])
+
+
+for(i in 1:vacc.events){
+  out <- ode(xstart, seq(tau, Tv, by=tau), sir.model.open, params, method='ode45', rtol=1e-7)
+  xstart <- out[dim(out)[1],2:4]       
+  xstart[1] <- (1-pv)*(tail(out,1)[2])  
+  xstart[3] <- xstart[3]+(pv)*(tail(out,1)[2]) 
+  data <- rbind(data,out[,2:4])     
+}
+
+
+data$time <- seq(50, Tmax+50, by=tau)
+
+
+mean.prevalence <- mean(data$I)
+
+}
+
+
+sample.pvs <- seq(0.1,0.95,0.05)
+
+mean.prevs <- c()
+
+for(i in 1:length(sample.pvs)){
+  mean.prevs[i]<- ex2(sample.pvs[i])
+}
+
+
+r0s <- seq(1.01,10,0.01)
+thold <- 1/r0s 
+
+plot()
+
+plot(x=sample.pvs, y=mean.prevs)
+```
+
+
+
+
+#### Exercise 6
+
+How does mean prevalence change if we pulse vaccination more frequently (e.g. Tv = 3) or less frequently (e.g. Tv = 5)?
+
+
+#### Exercise 7
+
+Is mean prevalence the only quantity of interest? Sometimes we may be interested in \worst case" scenarios. Calculate how the maximum prevalence changes as a function of the vaccination fraction. Your result should look like the following.
+
+
+
+
+
+
+
+
+
+
+### Social Distancing
+
+```{r}
+### R code from vignette source 'social-distancing.rnw'
+### Encoding: UTF-8
+
+###################################################
+### code chunk number 1: packages
+###################################################
+require(deSolve)
+
+#define a color palette
+pulp <- c(rgb(101,48,47, maxColorValue=255),    #brown
+          rgb(210,202,203, maxColorValue=255),  #gray
+          rgb(211,141,101, maxColorValue=255),  #peach
+          rgb(223,45,39, maxColorValue=255),    #red
+          rgb(250,208,10, maxColorValue=255),   #yellow
+          rgb(16,16,18, maxColorValue=255),     #black
+          rgb(76,106,147, maxColorValue=255)    #blue
+          )
+
+
+###################################################
+### code chunk number 2: sir-closed
+###################################################
+sir.model.closed <- function (t, x, params) {    #here we begin a function with three arguments
+  S <- x[1]                               #create local variable S, the first element of x
+  I <- x[2]                               #create local variable I
+  R <- x[3]                               #create local variable R
+  with(                                   #we can simplify code using "with"
+       as.list(params),                   #this argument to "with" lets us use the variable names
+       {                                  #the system of rate equations
+         dS <- -beta*S*I
+         dI <- beta*S*I-gamma*I
+         dR <- gamma*I
+         dx <- c(dS,dI,dR)                #combine results into a single vector dx
+         list(dx)                         #return result as a list
+       }
+       )
+}
+
+
+###################################################
+### code chunk number 3: parameters
+###################################################
+R0 <- 1.8
+N <-  1  				              #population size
+gamma <- 7/2.6  			        #recovery rate (in years)
+beta <- R0*(gamma)/N 	        #transmission rate
+phi <- 0.3333
+D <- 12
+xstart <- c(S=0, I=0, R=0)	  #initial conditions, must sum to one
+xstart[2] <- 1/58000000
+xstart[1] <- 1-xstart[2]
+xstart[3] <- 1-sum(xstart)
+Tmax <- 52                    #integrate for 200 years after transients
+params <- c(beta=beta, gamma=gamma)   #parameter vector
+tau <- 0.1                    #size of time step
+times <- seq(0, Tmax, by=tau) #function seq returns a sequence
+
+
+###################################################
+### code chunk number 4: social-distancing.rnw:125-126
+###################################################
+out <- as.data.frame(ode(xstart,times,sir.model.closed,params, method='ode45', rtol=1e-7))
+
+
+###################################################
+### code chunk number 5: plot-1
+###################################################
+plot(out$time,
+     out$I,
+     type='l',
+     lwd=2,
+     xlab='Time',
+     ylab='Infected',
+     col=pulp[7])  #plot the I variable against time
+
+
+###################################################
+### code chunk number 6: sd-initiated
+###################################################
+Tvec <- c(3, 5, 6, 7)
+
+
+###################################################
+### code chunk number 7: color (eval = FALSE)
+###################################################
+## require(EBImage)   # available on Bioconductor
+## require(rPlotter)  # https://github.com/woobe/rPlotter
+## 
+## ## Define a list of images from Tarantino's movies
+## lst_tar <- list(
+##   reservoir_dogs = "http://filmhash.files.wordpress.com/2011/06/reservoir-dogs-051.jpg",
+##   pulp_fiction = "http://www.scoutlondon.com/blog/wp-content/uploads/2012/05/Pulp-Fiction.jpg",
+##   kill_bill = "http://www.moviegoods.com/Assets/product_images/1010/477803.1010.A.jpg",
+##   django = "http://www.comingsoon.net/nextraimages/djangounchainednewposter.jpg"
+##   )
+## 
+## 
+## ## Create palette for each image and save them all into one PNG
+## png("example_tarantino.png", width = 1000, height = 1000, res = 150)
+## par(mfrow = c(4,4))
+## 
+## for (n_tar in 1:length(lst_tar)) {
+##   tmp_url <- unlist(lst_tar[n_tar])
+##   if (n_tar %% 2 != 0) display(readImage(tmp_url), method = "raster")
+##   set.seed(1234)
+##   pie(rep(1, 3), col = extract_colours(tmp_url, 3))
+##   pie(rep(1, 5), col = extract_colours(tmp_url, 5))
+##   if (n_tar %% 2 == 0) display(readImage(tmp_url), method = "raster")
+## }
+
+
+###################################################
+### code chunk number 8: solve
+###################################################
+
+# plot baseline again
+plot(out$time,
+     out$I,
+     type='l',
+     lwd=2,
+     xlab='Time',
+     ylab='Infected',
+     col=pulp[7])  #plot the I variable against time
+
+# create a list to store information for the legend
+legend.info <- data.frame(T=numeric(0),col=character(0),stringsAsFactors=FALSE)      
+
+for(i in 1:length(Tvec)){
+  T <- Tvec[i]
+
+  out1 <- ode(xstart,                               # start at initial condition
+             seq(0,T,tau),                          # solve from 0 to T
+             sir.model.closed,params,
+             method='ode45',
+             rtol=1e-7)  
+  
+  out2 <- ode(tail(out1,1)[2:4],                    # start at end of last solution
+             seq(T,T+D,tau),                        # solve from T to T+D
+             sir.model.closed,
+             c(beta=beta*(1-phi), gamma=gamma),     # change beta
+             method='ode45',
+             rtol=1e-7)
+  
+  out3 <- ode(tail(out2,1)[2:4],                    # start at end of last solution
+             seq(T+D, Tmax, tau),                   # solve from T+D to Tmax
+             sir.model.closed,
+             params,                                # reset parameters
+             method='ode45',
+             rtol=1e-7) 
+  
+  data <- as.data.frame(rbind(out1, out2, out3))
+  
+  lines(data$time,
+        data$I,
+        col=pulp[i],
+        lwd=2)
+  
+  legend.info[i,] <- c(T=T, col=as.character(pulp[i]))
+}
+
+legend('topright',
+       legend=paste('T=',legend.info$T, sep=''),
+       lty=1,
+       lwd=3,
+       col=legend.info$col,
+       bty='n')
+
+
+
+```
+
+#### Exercise 1
+
+Using the approach outlined in this lab, show that the nal epidemic size over a one-year period looks as below. Assume that initially everyone is susceptible and 1 out of 58 million are infectious. The social distancing strategy is in place for 12 weeks and R0 = 1:8 with a mean infectious period of 2.6 days. You can ignore host births/deaths.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Estimation
+
+
+```{r}
+load('./Workshop II/Ex4_Estimation/data.RData')
+plot(flu,type='b',log='y',main='Epidemic in a British boarding school', cex.main=0.85,
+ xlab='Day', ylab='Active influenza cases')
+```
+
+
+### Exercise 1
+
+This equation shows the important one-to-one relationship
+
+$$\hat{R_0}=\frac{log(1-Z/N)}{-Z/N}$$
+
+```{r}
+
+p.I <- seq(0,1,0.001)
+
+r0 <- log(1-p.I)/(-p.I)
+
+plot(x=r0,y=p.I)
+
+```
+
+### Exercise 2
+
+Our estimate assumes that boys remained infectious during the natural course of infections. ...
+
+```{r}
+
+model<-lm(log(flu[1:4])~day[1:4],data=flu);  #fit a linear model
+summary(model)         #summary statistics for fit model
+slope<-coef(model)[2]  #extract slope parameter
+slope                 #print to screen
+
+```
+
+
+
+```{r}
+gamma <- 0.4
+duration.I <- 1/gamma
+duration.I*24
+
+
+obs.di <- 1
+est.gamma <- 1/obs.di
+est.gamma
+
+slope+1
+
+slope/2+1
+
+#assume boys had similar sympomatic rate as adults
+slope/(10/4*(129/130)+1*(1/130))+1
+```
+
+
+
+
+
+### Exercise 3
+
+
+
+
+
+```{r}
+
+niamey[5,3]<-0  #replace a "NA"
+niamey<-data.frame(biweek=rep(seq(1,16),3),site=c(rep(1,16),rep(2,16),rep(3,16)),
+                   cases=c(niamey[,1],niamey[,2],niamey[,3])) #define "biweeks"
+```
+
+```{r}
+plot(niamey$biweek,niamey$cases,type='p',col=niamey$site,xlab='Biweek',ylab='Cases')
+lines(niamey$biweek[niamey$site==1],niamey$cases[niamey$site==1])
+lines(niamey$biweek[niamey$site==2],niamey$cases[niamey$site==2],col=2)
+lines(niamey$biweek[niamey$site==3],niamey$cases[niamey$site==3],col=3)
+
+```
+
+
+```{r}
+summary(lm(log(cases)~biweek, data=niamey[niamey$site==1 & niamey$biweek<9,]))$coefficients[2]
+
+preds <- exp(predict(lm(log(cases)~biweek, data=niamey[niamey$site==1 & niamey$biweek<9,])))
+
+plot(niamey$biweek,niamey$cases,type='p',col=niamey$site,xlab='Biweek',ylab='Cases')
+lines(niamey$biweek[niamey$site==1],niamey$cases[niamey$site==1])
+lines(niamey$biweek[niamey$site==2],niamey$cases[niamey$site==2],col=2)
+lines(niamey$biweek[niamey$site==3],niamey$cases[niamey$site==3],col=3)
+lines(niamey$biweek[niamey$site==1 & niamey$biweek<9],preds, lty=2, col=4)
+
+```
+
+
+
+```{r}
+
+plot(niamey$biweek,log(niamey$cases),type='p',col=niamey$site,xlab='Biweek',ylab='Cases')
+lines(niamey$biweek[niamey$site==1],log(niamey$cases[niamey$site==1]))
+lines(niamey$biweek[niamey$site==2],log(niamey$cases[niamey$site==2]),col=2)
+lines(niamey$biweek[niamey$site==3],log(niamey$cases[niamey$site==3]),col=3)
+abline(lm(log(cases)~biweek, data=niamey[niamey$site==1 & niamey$biweek<9,]), col=4)
+```
+
+```{r}
+summary(lm(log(cases)~biweek, data=niamey[niamey$site==1 & niamey$biweek<9,]))$coefficients[2]/(1/(14/365))+1
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+closed.sir.model <- function (t, x, params) {  #SIR model equations
+  S <- x[1]
+  I <- x[2]
+  beta <- params
+  dS <- -beta*S*I
+  dI <- beta*S*I-(365/13)*I
+  list(c(dS,dI))
+}
+
+
+sse.sir <- function(params0,data,site){  #function to calculate squared errors
+  data<-data[data$site==site,]    #working dataset, based on site
+  t <- data[,1]*14/365            #time in biweeks
+  cases <- data[,3]               #number of cases
+  beta <- exp(params0[1])            #parameter beta
+  S0 <- exp(params0[2])           #initial susceptibles
+  I0 <- exp(params0[3])           #initial infected        
+  out <- as.data.frame(ode(c(S=S0,I=I0),times=t,closed.sir.model,beta,hmax=1/120))
+  sse<-sum((out$I-cases)^2)       #sum of squared errors
+}
+```
+
+
+
+
+```{r}
+
+library(deSolve)   #differential equation library
+params0<-c(-3.2,7.3,-2.6)  #initial guess
+
+fit1 <- optim(params0,sse.sir,data=niamey,site=1) #fit
+exp(fit1$par)  #back-transform parameters
+fit2 <- optim(params0,sse.sir,data=niamey,site=2) #fit
+exp(fit2$par)  #back-transform parameters
+fit3 <- optim(params0,sse.sir,data=niamey,site=3) #fit
+exp(fit3$par)  #back-transform parameters
+```
+
+
+
+```{r}
+
+par(mfrow=c(3,1))   #set up plotting area for multiple panels
+plot(cases~biweek,data=subset(niamey,site==1),type='b',col='blue', pch=21) #plot site 1
+t <- subset(niamey,site==1)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit1$par[2]),I=exp(fit1$par[3])),times=t,
+                              closed.sir.model,exp(fit1$par[1]),hmax=1/120))
+                              #obtain model predictions
+lines(mod.pred$I~subset(niamey,site==1)[,1]) #and plot as a line
+
+plot(cases~biweek,data=subset(niamey,site==2),type='b',col=site) #site 2
+t <- subset(niamey,site==2)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit2$par[2]),I=exp(fit2$par[3])),times=t,
+                              closed.sir.model,exp(fit2$par[1]),hmax=1/120))
+lines(mod.pred$I~subset(niamey,site==2)[,1])
+
+
+plot(cases~biweek,data=subset(niamey,site==3),type='b',col=site) #site 3
+t <- subset(niamey,site==3)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit3$par[2]),I=exp(fit3$par[3])),times=t,
+                              closed.sir.model,exp(fit3$par[1]),hmax=1/120))
+lines(mod.pred$I~subset(niamey,site==3)[,1])
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Stochastic Simulation
+
+```{r}
+
+### R code from vignette source 'stochastic-simulation.rnw'
+### Encoding: UTF-8
+
+###################################################
+### code chunk number 1: stochastic-simulation.rnw:70-84
+###################################################
+SI.onestep <- function (x, params) {     #function for one step of the stochastic SI epidemic
+   X <- x[2]                             #the second element of x is number of susceptibles X
+   Y <- x[3]                             #the third element of x is number of infecteds Y
+   with(
+     as.list(params),
+     {
+       new.Y <- Y+1                      #whenever an event occurs we increase infecteds by 1...
+       new.X <- X-1                      #and descrease susceptibles by 1
+       
+       tau <- -log(runif(1))/(params$beta*X*Y/(X+Y)) #exponential random time to next event
+       c(tau=tau,X=new.X,Y=new.Y)        #store result
+       }
+     )
+}
+
+
+###################################################
+### code chunk number 2: stochastic-simulation.rnw:89-98
+###################################################
+SI.model <- function (x, params, nstep) { #function to iterate the stochastic SI for nstep events
+  output <- array(dim=c(nstep+1,3))       #set up an array to store all the results
+  colnames(output) <- c("time","X","Y")   #name the variables in the array
+  output[1,] <- x                         #the first record of the array is the initial condition
+  for (k in 1:nstep) {                    #iterate the model for nstep events
+    output[k+1,] <- x <- SI.onestep(x,params) #update x and store result
+  }
+  output                                  #return output
+}
+
+
+
+
+
+###################################################
+### code chunk number 3: stochastic-simulation.rnw:105-122
+###################################################
+set.seed(38499583)                        #set the random seed so results are repeatable
+nsims <- 10                               #number of simulations to run
+pop.size <- 200                           #total size of the population
+Y0 <- 2                                   #initial number infected
+nstep <- pop.size-Y0                      #how many steps to run? until everyone infected
+xstart <- c(time=0,X=(pop.size-Y0),Y=Y0)  #initial conditions
+params <- list(beta=0.3) #parameters
+data <- vector(mode='list',length=nsims)  #create a list called ``data'' to store all runs
+for (k in 1:nsims) {                      #simulate k different runs
+  data[[k]] <- as.data.frame(SI.model(xstart,params,nstep))  #main simulation step
+  data[[k]]$cum.time <- cumsum(data[[k]]$time) #calculates the running sum of inter-event intervals
+}
+max.y<-max(data[[1]]$cum.time)               #find the maximum time any simulation ran (to set x axis)
+plot(c(0,pop.size),c(0,pop.size),type='n',xlab='time',ylab='incidence',xlim=c(0,max.y)) #set up plot
+for (k in 1:nsims) {                      #loop over each simulation...
+  lines(Y~cum.time,data=data[[k]],col=k,type='o')  #to plot
+}
+```
+
+
+```{r}
+
+ex1<- function(.ys, .ns){
+
+###################################################
+### code chunk number 3: stochastic-simulation.rnw:105-122
+###################################################
+set.seed(38499583)                        #set the random seed so results are repeatable
+nsims <- 10                               #number of simulations to run
+pop.size <- .ns                           #total size of the population
+Y0 <- .ys                                   #initial number infected
+nstep <- pop.size-Y0                      #how many steps to run? until everyone infected
+xstart <- c(time=0,X=(pop.size-Y0),Y=Y0)  #initial conditions
+params <- list(beta=0.3) #parameters
+data <- vector(mode='list',length=nsims)  #create a list called ``data'' to store all runs
+for (k in 1:nsims) {                      #simulate k different runs
+  data[[k]] <- as.data.frame(SI.model(xstart,params,nstep))  #main simulation step
+  data[[k]]$cum.time <- cumsum(data[[k]]$time) #calculates the running sum of inter-event intervals
+}
+max.y<-max(data[[1]]$cum.time)               #find the maximum time any simulation ran (to set x axis)
+plot(c(0,pop.size),c(0,pop.size),type='n',xlab='time',ylab='incidence',xlim=c(0,max.y)) #set up plot
+for (k in 1:nsims) {                      #loop over each simulation...
+  lines(Y~cum.time,data=data[[k]],col=k,type='o')  #to plot
+}
+}
+
+combos<-expand.grid(
+  infecteds = seq(1,100,10),
+  pops = seq(101,1000, by=300)
+)
+
+
+for(i in 1:nrow(combos)){
+  ex1(.ys=combos[i,1], .ns=combos[i,2])
+}
+
+```
+
+
+
+
+
+```{r}
+###################################################
+### code chunk number 4: stochastic-simulation.rnw:138-162
+###################################################
+SIR.onestep <- function (x, params) {  #function to calculate one step of stochastic SIR
+  X <- x[2]                            #local variable for susceptibles
+  Y <- x[3]                            #local variable for infecteds
+  Z <- x[4]                            #local variable for recovereds
+  N <- X+Y+Z                           #total population size (subject to demographic change)
+  with(                                #use with as in deterministic model to simplify code
+       as.list(params), 
+       {
+         rates <- c(mu*N, beta*X*Y/N, mu*X, mu*Y, gamma*Y, mu*Z)
+         changes <- matrix(c( 1, 0, 0,
+                             -1, 1, 0,
+                             -1, 0, 0,
+                              0,-1, 0,
+                              0,-1, 1,
+                              0, 0,-1),
+                           ncol=3, byrow=TRUE)
+         tau <- -log(runif(1)) / sum(rates)   # exponential waiting time
+         U <- runif(1)       #uniform random deviate
+         m <- min(which(cumsum(rates)>=U*sum(rates)))
+         x <- x[2:4] + changes[m,]
+         return(out <- c(tau, x))
+       }
+       )
+}
+
+
+###################################################
+### code chunk number 5: stochastic-simulation.rnw:167-177
+###################################################
+
+SIR.model <- function (x, params, nstep) {  #function to simulate stochastic SIR
+  output <- array(dim=c(nstep+1,4))         #set up array to store results
+  colnames(output) <- c("time","X","Y","Z") #name variables
+  output[1,] <- x                           #first record of output is initial condition
+  for (k in 1:nstep) {                      #iterate for nstep steps
+    output[k+1,] <- x <- SIR.onestep(x,params)
+  }
+  output                                    #return output
+}
+```
+
+
+
+
+
+```{r}
+
+###################################################
+### code chunk number 6: stochastic-simulation.rnw:182-201
+###################################################
+set.seed(38499583)                #set seed
+nsims <- 10                       #number of simulations
+pop.size <- 100                   #total population size
+Y0 <- 8                           #initial number infected
+X0 <- round(0.9*pop.size)        #initial number suscepitlble (~90% of population)
+nstep <- 1600                     #number of events to simulate
+xstart <- c(time=0,X=X0,Y=Y0,Z=pop.size-X0-Y0) #initial conditions
+params <- list(mu=0.00001,beta=60,gamma=365/13) #parameters
+data <- vector(mode='list',length=nsims) #initialize list to store the output
+for (k in 1:nsims) {              #simulate nsims times
+  data[[k]] <- as.data.frame(SIR.model(xstart,params,nstep))
+  data[[k]]$cum.time <- cumsum(data[[k]]$time)
+}
+max.time<-data[[1]]$cum.time[max(which(data[[1]]$Y>0))] #maximum time in first simulation
+max.y<-1.8*max(data[[1]]$Y)       #find max infected in run 1 and increase by 80% for plot
+plot(Y~cum.time,data=data[[1]],xlab='Time',ylab='Incidence',col=1,xlim=c(0,max.time),ylim=c(0,max.y))
+for (k in 1:nsims) {              #add multiple epidemics to plot
+  lines(Y~cum.time,data=data[[k]],col=k,type='o')
+}
+
+
+
+
+```
+
+```{r}
+ex2<-function(.ys, .ns){
+###################################################
+### code chunk number 6: stochastic-simulation.rnw:182-201
+###################################################
+set.seed(38499583)                #set seed
+nsims <- 10                       #number of simulations
+pop.size <- .ns                   #total population size
+Y0 <- .ys                           #initial number infected
+X0 <- round(0.9*pop.size)        #initial number suscepitlble (~90% of population)
+nstep <- 1600                     #number of events to simulate
+xstart <- c(time=0,X=X0,Y=Y0,Z=pop.size-X0-Y0) #initial conditions
+params <- list(mu=0.00001,beta=60,gamma=365/13) #parameters
+data <- vector(mode='list',length=nsims) #initialize list to store the output
+for (k in 1:nsims) {              #simulate nsims times
+  data[[k]] <- as.data.frame(SIR.model(xstart,params,nstep))
+  data[[k]]$cum.time <- cumsum(data[[k]]$time)
+}
+max.time<-data[[1]]$cum.time[max(which(data[[1]]$Y>0))] #maximum time in first simulation
+max.y<-1.8*max(data[[1]]$Y)       #find max infected in run 1 and increase by 80% for plot
+plot(Y~cum.time,data=data[[1]],xlab='Time',ylab='Incidence',col=1,xlim=c(0,max.time),ylim=c(0,max.y))
+for (k in 1:nsims) {              #add multiple epidemics to plot
+  lines(Y~cum.time,data=data[[k]],col=k,type='o')
+}
+
+}
+
+combos<-expand.grid(
+  infecteds = seq(1,100,10),
+  pops = seq(101,1000, by=300)
+)
+
+
+for(i in 1:nrow(combos)){
+  ex2(.ys=combos[i,1], .ns=combos[i,2])
+}
+
+```
 
 
 
