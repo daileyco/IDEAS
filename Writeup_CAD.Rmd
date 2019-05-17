@@ -1380,7 +1380,7 @@ par(op)                                                     #re-set graphical pa
 
 
 
-
+# Module 4
 
 
 
@@ -1850,7 +1850,6 @@ for(i in 1:length(sample.pvs)){
 r0s <- seq(1.01,10,0.01)
 thold <- 1/r0s 
 
-plot()
 
 plot(x=sample.pvs, y=mean.prevs)
 ```
@@ -2076,6 +2075,16 @@ Using the approach outlined in this lab, show that the nal epidemic size over a
 
 ```{r}
 load('./Workshop II/Ex4_Estimation/data.RData')
+
+
+niamey[5,3]<-0  #replace a "NA"
+niamey<-data.frame(biweek=rep(seq(1,16),3),site=c(rep(1,16),rep(2,16),rep(3,16)),
+                   cases=c(niamey[,1],niamey[,2],niamey[,3])) #define "biweeks"
+
+```
+
+
+```{r}
 plot(flu,type='b',log='y',main='Epidemic in a British boarding school', cex.main=0.85,
  xlab='Day', ylab='Active influenza cases')
 ```
@@ -2140,12 +2149,7 @@ slope/(10/4*(129/130)+1*(1/130))+1
 
 
 
-```{r}
 
-niamey[5,3]<-0  #replace a "NA"
-niamey<-data.frame(biweek=rep(seq(1,16),3),site=c(rep(1,16),rep(2,16),rep(3,16)),
-                   cases=c(niamey[,1],niamey[,2],niamey[,3])) #define "biweeks"
-```
 
 ```{r}
 plot(niamey$biweek,niamey$cases,type='p',col=niamey$site,xlab='Biweek',ylab='Cases')
@@ -2181,6 +2185,7 @@ abline(lm(log(cases)~biweek, data=niamey[niamey$site==1 & niamey$biweek<9,]), co
 ```
 
 ```{r}
+
 summary(lm(log(cases)~biweek, data=niamey[niamey$site==1 & niamey$biweek<9,]))$coefficients[2]/(1/(14/365))+1
 
 
@@ -2191,8 +2196,36 @@ summary(lm(log(cases)~biweek, data=niamey[niamey$site==1 & niamey$biweek<9,]))$c
 
 
 
+### Exercise 4
+
+```{r}
+
+ex4<-function(.nobs){
+summary(lm(log(cases)~biweek, data=niamey[niamey$site==1 & niamey$biweek<.nobs,]))$coefficients[2]/(1/(14/365))+1
+}
+
+ns <- 3:11
+
+r0s <- c()
+
+for(i in 1:length(ns)){
+  r0s[i] <- ex4(.nobs=ns[i])  
+}
 
 
+plot(x=(ns-1), y=r0s)
+```
+
+
+
+
+
+
+
+
+
+
+### Exercise 5
 
 
 
@@ -2270,8 +2303,170 @@ lines(mod.pred$I~subset(niamey,site==3)[,1])
 
 
 
+```{r}
 
 
+closed.sir.model <- function (t, x, params) {  #SIR model equations
+  S <- x[1]
+  I <- x[2]
+  beta <- params[1]
+  gamma <- params[2]
+  dS <- -beta*S*I
+  dI <- beta*S*I-gamma*I
+  list(c(dS,dI))
+}
+
+sse.sir <- function(params0,data,site){  #function to calculate squared errors
+  data<-data[data$site==site,]    #working dataset, based on site
+  t <- data[,1]*14/365            #time in biweeks
+  cases <- data[,3]               #number of cases
+  beta <- exp(params0[1])            #parameter beta
+  S0 <- exp(params0[2])           #initial susceptibles
+  I0 <- exp(params0[3])           #initial infected
+  gamma <- exp(params0[4])
+  out <- as.data.frame(ode(c(S=S0,I=I0),times=t,closed.sir.model,parms=c(beta,gamma),hmax=1/120))
+  sse<-sum((out$I-cases)^2)       #sum of squared errors
+}
+
+```
+
+
+
+```{r}
+library(deSolve)   #differential equation library
+params0<-c(-3.2,7.3,-2.6,-4.0)  #initial guess
+
+fit1 <- optim(params0,sse.sir,data=niamey,site=1) #fit
+exp(fit1$par)  #back-transform parameters
+fit2 <- optim(params0,sse.sir,data=niamey,site=2) #fit
+exp(fit2$par)  #back-transform parameters
+fit3 <- optim(params0,sse.sir,data=niamey,site=3) #fit
+exp(fit3$par)  #back-transform parameters
+
+
+
+```
+
+
+```{r}
+
+par(mfrow=c(3,1))   #set up plotting area for multiple panels
+plot(cases~biweek,data=subset(niamey,site==1),type='b',col='blue', pch=21) #plot site 1
+t <- subset(niamey,site==1)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit1$par[2]),I=exp(fit1$par[3])),times=t,
+                              closed.sir.model,parms=c(exp(fit1$par[1]),exp(fit1$par[4])),hmax=1/120))
+                              #obtain model predictions
+lines(mod.pred$I~subset(niamey,site==1)[,1]) #and plot as a line
+
+plot(cases~biweek,data=subset(niamey,site==2),type='b',col=site) #site 2
+t <- subset(niamey,site==2)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit2$par[2]),I=exp(fit2$par[3])),times=t,
+                              closed.sir.model,parms=c(exp(fit2$par[1]),exp(fit2$par[4])),hmax=1/120))
+lines(mod.pred$I~subset(niamey,site==2)[,1])
+
+
+plot(cases~biweek,data=subset(niamey,site==3),type='b',col=site) #site 3
+t <- subset(niamey,site==3)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit3$par[2]),I=exp(fit3$par[3])),times=t,
+                              closed.sir.model,parms=c(exp(fit3$par[1]),exp(fit3$par[4])),hmax=1/120))
+lines(mod.pred$I~subset(niamey,site==3)[,1])
+
+
+
+```
+
+
+
+
+
+
+
+
+### Exercise 6
+
+```{r}
+
+
+closed.sir.model <- function (t, x, params) {  #SIR model equations
+  S <- x[1]
+  I <- x[2]
+  beta <- params[1]
+  gamma <- params[2]
+  dS <- -beta*S*I
+  dI <- beta*S*I-gamma*I
+  list(c(dS,dI))
+}
+
+sse.sir <- function(params0,data,site){  #function to calculate squared errors
+  data<-data[data$site==site,]    #working dataset, based on site
+  t <- data[,1]*14/365            #time in biweeks
+  cases <- data[,3]               #number of cases
+  beta <- exp(params0[1])            #parameter beta
+  S0 <- exp(params0[2])           #initial susceptibles
+  I0 <- 1.0 # exp(params0[3])           #initial infected
+  gamma <- exp(params0[3])
+  out <- as.data.frame(
+    ode(
+      c(S=S0,I=I0),
+      times=t,
+      closed.sir.model,
+      parms=c(beta,gamma),
+      hmax=1/120)
+    )
+  sse<-sum((out$I-cases)^2)       #sum of squared errors
+}
+
+library(deSolve)   #differential equation library
+params0<-c(-3.2,#7.3,
+           -2.6,-4.0)  #initial guess
+
+fit1 <- optim(params0,sse.sir,data=niamey,site=1) #fit
+exp(fit1$par)  #back-transform parameters
+fit2 <- optim(params0,sse.sir,data=niamey,site=2) #fit
+exp(fit2$par)  #back-transform parameters
+fit3 <- optim(params0,sse.sir,data=niamey,site=3) #fit
+exp(fit3$par)  #back-transform parameters
+
+
+
+par(mfrow=c(3,1))   #set up plotting area for multiple panels
+plot(cases~biweek,data=subset(niamey,site==1),type='b',col='blue', pch=21) #plot site 1
+t <- subset(niamey,site==1)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit1$par[2]),I=1 #exp(fit1$par[3])
+                              ),times=t,
+                              closed.sir.model,parms=c(exp(fit1$par[1]),1.0 #exp(fit1$par[3])
+                                                       ),hmax=1/120))
+                              #obtain model predictions
+lines(mod.pred$I~subset(niamey,site==1)[,1]) #and plot as a line
+
+plot(cases~biweek,data=subset(niamey,site==2),type='b',col=site) #site 2
+t <- subset(niamey,site==2)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit2$par[2]),I=1.0#exp(fit2$par[3])
+                              ),times=t,
+                              closed.sir.model,parms=c(exp(fit2$par[1]),1 #exp(fit2$par[3])
+                                                       ),hmax=1/120))
+lines(mod.pred$I~subset(niamey,site==2)[,1])
+
+
+plot(cases~biweek,data=subset(niamey,site==3),type='b',col=site) #site 3
+t <- subset(niamey,site==3)[,1]*14/365
+mod.pred<-as.data.frame(ode(c(S=exp(fit3$par[2]),I=1 #exp(fit3$par[3])
+                              ),times=t,
+                              closed.sir.model,parms=c(exp(fit3$par[1]),1 #exp(fit3$par[3])
+                                                       ),hmax=1/120))
+lines(mod.pred$I~subset(niamey,site==3)[,1])
+
+
+
+```
+
+### Exercise 7
+
+```{r}
+print(paste0("The -logLikelihoods are -", fit1$value, fit2$value, fit3$value, " for Site1, 2, and 3, respectively.???"))
+
+
+```
 
 
 
@@ -2487,23 +2682,846 @@ for (k in 1:nsims) {              #simulate nsims times
 max.time<-data[[1]]$cum.time[max(which(data[[1]]$Y>0))] #maximum time in first simulation
 max.y<-1.8*max(data[[1]]$Y)       #find max infected in run 1 and increase by 80% for plot
 plot(Y~cum.time,data=data[[1]],xlab='Time',ylab='Incidence',col=1,xlim=c(0,max.time),ylim=c(0,max.y))
+legend("topright",paste0("Y0=", .ys, "; N=", .ns))
 for (k in 1:nsims) {              #add multiple epidemics to plot
   lines(Y~cum.time,data=data[[k]],col=k,type='o')
 }
 
 }
 
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+if(require(animation)){library(animation)}else{install.packages("animation");library(animation)}
+
+
 combos<-expand.grid(
   infecteds = seq(1,100,10),
   pops = seq(101,1000, by=300)
 )
 
-
+saveGIF(
 for(i in 1:nrow(combos)){
   ex2(.ys=combos[i,1], .ns=combos[i,2])
+}, "sir_stochastic.gif", extra.opts=list(delay="10>"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Module 5
+
+
+## Sensitivity
+
+### Ebola
+
+```{r}
+if(require(deSolve)){library(deSolve)}else{install.packages("deSolve");library(deSolve)}
+
+if(require(lhs)){library(lhs)}else{install.packages("lhs");library(lhs)}
+
+if(require(sensitivity)){library(sensitivity)}else{install.packages("sensitivity");library(sensitivity)}
+```
+
+
+
+
+
+
+
+#### Exercise 1
+
+
+```{r}
+legrand <- function(t, x, params){
+
+  # states
+  S <- x[1]
+  E <- x[2]
+  I <- x[3]
+  H <- x[4]
+  F <- x[5]
+  R <- x[6]
+  N <- S+E+I+H+F+R
+  
+  # calculated parameters
+  gammaih = params$gammai*params$gammah/(params$gammah - params$gammai)
+  gammadh = params$gammad*params$gammah/(params$gammah - params$gammad)
+  # rates
+  r1 <- (params$betaI*S*I + params$betaH*S*H + params$betaF*S*F)/N
+  r2 <- params$alpha*E
+  r3 <- params$gammah*params$theta1*I
+  r4 <- gammadh*params$delta2*H
+  r5 <- params$gammaf*F
+  r6 <- params$gammai*(1-params$theta1)*(1-params$delta1)*I
+  r7 <- params$delta1*(1-params$theta1)*params$gammad*I
+  r8 <- gammaih*(1-params$delta2)*H
+  
+  # derivatives
+  dS <- -r1
+  dE <- r1 - r2
+  dI <- r2 - r3 - r7 - r6
+  dH <- r3 - r4 - r8
+  dF <- r4 + r7 - r5
+  dR <- r5 + r6 + r8
+    
+  #output
+  out <- list(c(dS, dE, dI, dH, dF, dR))
 }
 
 ```
 
 
 
+#### Exercise 2
+
+
+
+```{r}
+###################################################
+### code chunk number 2: sensitivity-ebola.rnw:125-143
+###################################################
+
+times <- seq(0, 52, by=1)  #solve for 52 weeks
+params <- list(betaI=2.532,
+               betaH=0.012,
+               betaF=0.462,
+               alpha=7/12,
+               gammah=7/4.2,
+               gammai=7/10,
+               gammaf=7/2,
+               gammad = 7/8,
+               theta1=0.65,
+               delta1=0.47,
+               delta2=0.42)
+pop.size <- 470000
+I0 <- 9
+xstart <- c(S=pop.size-I0, E=0, I=I0 , H=0, F=0, R=0)
+out <- as.data.frame(ode(xstart, times, legrand, params))
+
+
+###################################################
+### code chunk number 3: sensitivity-ebola.rnw:147-156
+###################################################
+plot.legrand <- function(out){
+  par(mfrow=c(3,2))
+  plot(out$time, out$S, xlab='Time', ylab='Susceptible', type='l', col='steelblue4', lwd=3)
+  plot(out$time, out$E, xlab='Time', ylab='Exposed', type='l', col='steelblue4', lwd=3)
+  plot(out$time, out$I, xlab='Time', ylab='Infectious', type='l', col='steelblue4', lwd=3)
+  plot(out$time, out$H, xlab='Time', ylab='Hospitalized', type='l', col='steelblue4', lwd=3)
+  plot(out$time, out$F, xlab='Time', ylab='Funeral', type='l', col='steelblue4', lwd=3)
+  plot(out$time, out$R, xlab='Time', ylab='Removed', type='l', col='steelblue4', lwd=3)
+}
+
+
+###################################################
+### code chunk number 4: sensitivity-ebola.rnw:159-160
+###################################################
+plot.legrand(out)
+
+```
+
+
+
+### Exercise 3
+
+```{r}
+###################################################
+### code chunk number 5: sensitivity-ebola.rnw:169-207
+###################################################
+
+# model of Legrand et al (2007) with interventions
+legrand2 <- function(t, x, params){
+
+  # states
+  S <- x[1]
+  E <- x[2]
+  I <- x[3]
+  H <- x[4]
+  F <- x[5]
+  R <- x[6]
+  N <- S+E+I+H+F+R
+  
+  # calculated parameters
+  gammaih = params$gammai*params$gammah/(params$gammah - params$gammai)
+  gammadh = params$gammad*params$gammah/(params$gammah - params$gammad)
+  
+  # rates
+  r1 <- (params$betaI*S*I*(t<T) + params$betaI*S*I*(1-params$z)*(t>=params$T) + params$betaH*S*H*(t<params$T) + params$betaF*S*F*(t<params$T))/N
+  r2 <- params$alpha*E
+  r3 <- params$gammah*params$theta1*I
+  r4 <- gammadh*params$delta2*H
+  r5 <- params$gammaf*F
+  r6 <- params$gammai*(1-params$theta1)*(1-params$delta1)*I
+  r7 <- params$delta1*(1-params$theta1)*params$gammad*I
+  r8 <- gammaih*(1-params$delta2)*H
+  
+  # derivatives
+  dS <- -r1
+  dE <- r1 - r2
+  dI <- r2 - r3 - r7 - r6
+  dH <- r3 - r4 - r8
+  dF <- r4 + r7 - r5
+  dR <- r5 + r6 + r8
+    
+  #output
+  out <- list(c(dS, dE, dI, dH, dF, dR))
+}
+
+
+###################################################
+### code chunk number 6: sensitivity-ebola.rnw:211-228
+###################################################
+params2 <- list(betaI=2.532,
+               betaH=0.012,
+               betaF=0.462,
+               alpha=7/12,
+               gammah=7/4.2,
+               gammai=7/10,
+               gammaf=7/2,
+               gammad = 7/8,
+               theta1=0.65,
+               delta1=0.47,
+               delta2=0.42,
+               T=7,
+               z=0.88)
+pop.size <- 470000
+I0 <- 9
+xstart <- c(S=pop.size-I0, E=0, I=I0 , H=0, F=0, R=0)
+out2 <- as.data.frame(ode(xstart, times, legrand2, params2))
+
+
+###################################################
+### code chunk number 7: sensitivity-ebola.rnw:232-233
+###################################################
+plot.legrand(out2)
+
+```
+
+
+```{r}
+###################################################
+### code chunk number 8: sensitivity-ebola.rnw:240-241
+###################################################
+get.size <- function(out) tail(out$R,1)
+
+
+###################################################
+### code chunk number 9: sensitivity-ebola.rnw:247-256
+###################################################
+output0 <- rep(NA, 15)
+intervention.times <- seq(1,15)
+for(T in intervention.times){
+  params2$T <- T
+  out3 <- as.data.frame(ode(xstart, times, legrand2, params2))
+  output0[T] <- get.size(out3)  
+}
+
+plot(intervention.times, output0, log='y', xlab='Intervention time', ylab='Epidemic size', las=1)
+
+```
+
+
+
+### Exercise 4
+
+```{r}
+###################################################
+### code chunk number 10: sensitivity-ebola.rnw:264-268
+###################################################
+           #add the lhs library
+h <- 1000               #choose number of points
+set.seed(6242015)
+lhs<-maximinLHS(h,12)   #simulate
+
+
+###################################################
+### code chunk number 11: sensitivity-ebola.rnw:273-297
+###################################################
+betaI.min <- 1
+betaI.max <- 4
+betaH.min <- 0.01
+betaH.max <- 0.5
+betaF.min <- 0.1
+betaF.max <- 4
+alpha.min <- 7/21
+alpha.max <- 7/2
+gammah.min <- 7/2
+gammah.max <- 7/1
+gammai.min <- 7/21
+gammai.max <- 7/2
+gammaf.min <- 7/7
+gammaf.max <- 7/1
+gammad.min <- 7/21
+gammad.max <- 7/2
+theta1.min <- 0
+theta1.max <- 1
+delta1.min <- 0
+delta1.max <- 1
+delta2.min <- 0
+delta2.max <- 1
+z.min <- 0
+z.max <- 1
+
+
+###################################################
+### code chunk number 12: sensitivity-ebola.rnw:301-314
+###################################################
+params.set <- cbind(
+  betaI = lhs[,1]*(betaI.max-betaI.min)+betaI.min,
+  betaH = lhs[,2]*(betaH.max-betaH.min)+betaH.min,
+  betaF = lhs[,3]*(betaF.max-betaF.min)+betaF.min,
+  alpha = lhs[,4]*(alpha.max-alpha.min)+alpha.min,
+  gammah = lhs[,5]*(gammah.max-gammah.min)+gammah.min,
+  gammai = lhs[,6]*(gammai.max-gammai.min)+gammai.min,
+  gammaf = lhs[,7]*(gammaf.max-gammaf.min)+gammaf.min,
+  gammad = lhs[,8]*(gammad.max-gammad.min)+gammad.min,  
+  theta1 = lhs[,9]*(theta1.max-theta1.min)+theta1.min,  
+  delta1 = lhs[,10]*(delta1.max-delta1.min)+delta1.min,  
+  delta2 = lhs[,11]*(delta2.max-delta2.min)+delta2.min,    
+  z = lhs[,12]*(z.max-z.min)+z.min)  
+
+
+###################################################
+### code chunk number 13: sensitivity-ebola.rnw:319-320
+###################################################
+levels <- 15
+
+
+###################################################
+### code chunk number 14: sensitivity-ebola.rnw:325-326
+###################################################
+h2 <-250
+
+
+###################################################
+### code chunk number 15: sensitivity-ebola.rnw:331-345
+###################################################
+j <- 1  
+data <- data.frame(matrix(rep(NA,levels*h2*14),nrow=levels*h2))
+for(i in 1:h2){
+  for (T in intervention.times){
+    
+    data[j,1:13] <- params <- as.list(c(params.set[i,], T=T))
+    out <- as.data.frame(ode(xstart, times, legrand2, params))
+    data[j,14] <- get.size(out)
+    j <- j+1
+    
+  }
+}
+names(data) <- c(names(params),'outbreak.size')
+```
+
+
+```{r, eval=FALSE}
+save(data, file='./Workshop II/Ex6_SensitivityAnalysis_Ebola/data.Rdata')
+```
+
+
+
+
+
+```{r}
+
+
+
+
+###################################################
+### code chunk number 16: sensitivity-ebola.rnw:351-356
+###################################################
+load('./Workshop II/Ex6_SensitivityAnalysis_Ebola/data.Rdata')
+plot(intervention.times, output0, type='l', lwd=3, ylim=c(10,2e6), log='y',
+            xlab='Intervention times',
+            ylab='Epidemic size')
+points(data$T, data$outbreak.size, pch=19, cex=0.3, col='blue')
+
+
+###################################################
+### code chunk number 17: sensitivity-ebola.rnw:363-366
+###################################################
+boxplot(data$outbreak.size~data$T, ylim=c(10,2e6), border='blue', log='y', pch='.')
+par(new=TRUE)
+plot(intervention.times, output0, type='l', lwd=3, ylim=c(10,2e6), log='y', xlab='Intervention times', ylab='Epidemic size', axes=FALSE)
+
+
+###################################################
+### code chunk number 18: sensitivity-ebola.rnw:382-386
+###################################################
+library(sensitivity)
+bonferroni.alpha <- 0.05/12
+prcc <- pcc(data[,1:12], data[,14], nboot = 1000, rank=TRUE, conf=1-bonferroni.alpha)
+save(prcc, file='prcc.Rdata')
+
+
+###################################################
+### code chunk number 19: sensitivity-ebola.rnw:392-405
+###################################################
+library(sensitivity)
+load('prcc.Rdata')
+summary <- print(prcc)
+par(mar=c(7,4,4,2)+0.1)
+plot(summary$original, main='Partial rank correlation coefficients', ylim=c(-1,1),
+     xlab='', ylab='Coefficient',
+     axes=FALSE)
+axis(2)
+axis(1, at=seq(1:12), labels=row.names(summary), las=2)
+mtext(text='Parameter', side=1, line=4.5)
+box()
+for(i in 1:12) lines(c(i,i),c(summary[i,4], summary[i,5]))
+abline(h=0)
+
+
+
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+#### Exercise 5
+
+
+
+```{r}
+###################################################
+### code chunk number 10: sensitivity-ebola.rnw:264-268
+###################################################
+           #add the lhs library
+h <- 1000               #choose number of points
+set.seed(6242015)
+lhs<-maximinLHS(h,12)   #simulate
+
+
+###################################################
+### code chunk number 11: sensitivity-ebola.rnw:273-297
+###################################################
+betaI.min <- 0.5
+betaI.max <- 7
+betaH.min <- 0.01
+betaH.max <- 0.5
+betaF.min <- 0.1
+betaF.max <- 4
+alpha.min <- 7/21
+alpha.max <- 7/2
+gammah.min <- 7/2
+gammah.max <- 7/1
+gammai.min <- 0.2
+gammai.max <- 4.5
+gammaf.min <- 7/7
+gammaf.max <- 7/1
+gammad.min <- 7/21
+gammad.max <- 7/2
+theta1.min <- 0
+theta1.max <- 1
+delta1.min <- 0
+delta1.max <- 1
+delta2.min <- 0
+delta2.max <- 1
+z.min <- 0
+z.max <- 1
+
+
+###################################################
+### code chunk number 12: sensitivity-ebola.rnw:301-314
+###################################################
+params.set <- cbind(
+  betaI = lhs[,1]*(betaI.max-betaI.min)+betaI.min,
+  betaH = lhs[,2]*(betaH.max-betaH.min)+betaH.min,
+  betaF = lhs[,3]*(betaF.max-betaF.min)+betaF.min,
+  alpha = lhs[,4]*(alpha.max-alpha.min)+alpha.min,
+  gammah = lhs[,5]*(gammah.max-gammah.min)+gammah.min,
+  gammai = lhs[,6]*(gammai.max-gammai.min)+gammai.min,
+  gammaf = lhs[,7]*(gammaf.max-gammaf.min)+gammaf.min,
+  gammad = lhs[,8]*(gammad.max-gammad.min)+gammad.min,  
+  theta1 = lhs[,9]*(theta1.max-theta1.min)+theta1.min,  
+  delta1 = lhs[,10]*(delta1.max-delta1.min)+delta1.min,  
+  delta2 = lhs[,11]*(delta2.max-delta2.min)+delta2.min,    
+  z = lhs[,12]*(z.max-z.min)+z.min)  
+
+
+###################################################
+### code chunk number 13: sensitivity-ebola.rnw:319-320
+###################################################
+levels <- 15
+
+
+###################################################
+### code chunk number 14: sensitivity-ebola.rnw:325-326
+###################################################
+h2 <-250
+
+
+###################################################
+### code chunk number 15: sensitivity-ebola.rnw:331-345
+###################################################
+j <- 1  
+data <- data.frame(matrix(rep(NA,levels*h2*14),nrow=levels*h2))
+for(i in 1:h2){
+  for (T in intervention.times){
+    
+    data[j,1:13] <- params <- as.list(c(params.set[i,], T=T))
+    out <- as.data.frame(ode(xstart, times, legrand2, params))
+    data[j,14] <- get.size(out)
+    j <- j+1
+    
+  }
+}
+names(data) <- c(names(params),'outbreak.size')
+
+save(data, file='./Workshop II/Ex6_SensitivityAnalysis_Ebola/data1.Rdata')
+
+
+###################################################
+### code chunk number 16: sensitivity-ebola.rnw:351-356
+###################################################
+load('./Workshop II/Ex6_SensitivityAnalysis_Ebola/data1.Rdata')
+plot(intervention.times, output0, type='l', lwd=3, ylim=c(10,2e6), log='y',
+            xlab='Intervention times',
+            ylab='Epidemic size')
+points(data$T, data$outbreak.size, pch=19, cex=0.3, col='blue')
+
+
+###################################################
+### code chunk number 17: sensitivity-ebola.rnw:363-366
+###################################################
+boxplot(data$outbreak.size~data$T, ylim=c(10,2e6), border='blue', log='y', pch='.')
+par(new=TRUE)
+plot(intervention.times, output0, type='l', lwd=3, ylim=c(10,2e6), log='y', xlab='Intervention times', ylab='Epidemic size', axes=FALSE)
+
+
+###################################################
+### code chunk number 18: sensitivity-ebola.rnw:382-386
+###################################################
+library(sensitivity)
+bonferroni.alpha <- 0.05/12
+prcc <- pcc(data[,1:12], data[,14], nboot = 1000, rank=TRUE, conf=1-bonferroni.alpha)
+save(prcc, file='prcc.Rdata')
+
+
+###################################################
+### code chunk number 19: sensitivity-ebola.rnw:392-405
+###################################################
+library(sensitivity)
+load('prcc.Rdata')
+summary <- print(prcc)
+par(mar=c(7,4,4,2)+0.1)
+plot(summary$original, main='Partial rank correlation coefficients', ylim=c(-1,1),
+     xlab='', ylab='Coefficient',
+     axes=FALSE)
+axis(2)
+axis(1, at=seq(1:12), labels=row.names(summary), las=2)
+mtext(text='Parameter', side=1, line=4.5)
+box()
+for(i in 1:12) lines(c(i,i),c(summary[i,4], summary[i,5]))
+abline(h=0)
+
+
+
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Structured Models
+
+```{r}
+load('./Workshop II/Ex8_StructuredModels/data.RData')
+
+if(require(deSolve)){library(deSolve)}else{install.packages("deSolve");library(deSolve)}
+
+plot(measles$Time,measles$Cases,type='l', xlab='Year',ylab='Cases')  #plot cases over time
+```
+
+
+
+```{r}
+
+###################################################
+### code chunk number 3: structured-models.rnw:72-78
+###################################################
+#plot measles cases in subsequent two year intervals using the constructed variable "TwoYEAR"
+plot(measles$TwoYear,measles$Cases,type='p',pch=20,col='grey',xlab='Time (years)',ylab='Cases')
+#fit a smooth line using loess -- notice data must be ordered for loess to fit properly
+smooth.cases<-loess(measles$Cases[order(measles$TwoYear)]~measles$TwoYear[order(measles$TwoYear)],
+                    span=0.3)
+lines(smooth.cases$x,smooth.cases$fitted,lwd=2)  #add smooth fit
+```
+
+
+
+
+
+```{r}
+
+###################################################
+### code chunk number 4: structured-models.rnw:86-99
+###################################################
+age.model<-function(t,x,parms){  #a function to return derivatives of age structured model
+ S<-x[1:4]     #S are the first four elements of x
+ E<-x[5:8]     #E are the next four elements of x
+ I<-x[9:12]    #I are the last four elements ofx
+ dx<-vector(length=12)   #a vector to store the derivatives
+  for(a in 1:4){   #loop over age classes
+   tmp <- (parms$beta[a,]%*%I)*S[a]   #temporary variable with infection rate
+   dx[a] <- parms$nu[a]*55/75 - tmp - parms$mu[a]*S[a]                 #dS
+   dx[a+4] <- tmp - parms$sigma*E[a] - parms$mu[a]*E[a]                #dE
+   dx[a+8] <- parms$sigma*E[a] - parms$gamma*I[a] - parms$mu[a]*I[a]   #dI
+ }  
+return(list(dx))  #return the result
+}
+
+
+###################################################
+### code chunk number 5: structured-models.rnw:104-112
+###################################################
+y0<-c(0.05, 0.01, 0.01, 0.008, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001)
+#initialize state variables
+
+#a list of model parameters
+parms<-list(beta=matrix(c(2.089, 2.089, 2.086, 2.037, 2.089, 9.336, 2.086, 2.037, 2.086, 2.086,
+            2.086, 2.037, 2.037, 2.037, 2.037,2.037),nrow=4,byrow=TRUE),
+            sigma=1/8, gamma=1/5, nu=c(1/(55*365),0,0,0),  mu=c(1/(55*365),0,0,0))
+parms
+
+
+###################################################
+### code chunk number 6: structured-models.rnw:117-146
+###################################################
+n=c(6,4,10,55)/75   #number of years in each age class
+maxTime <- 100*365  #number of days in 100 years
+T0=0                #initial time
+S=c()               #initialize S
+E=c()               #initialize E
+I=c()               #initialize E
+T=c()               #initialize T, a vector to hold times
+while(T0<maxTime){  #loop over times
+  y=lsoda(y0,c(T0, T0+365),age.model,parms) #solve diff'l equation for each time
+  T=rbind(T, y[2,1])      #store results
+  S=rbind(S, y[2,2:5])
+  E=rbind(E, y[2,6:9])
+  I=rbind(I, y[2,10:13])
+  #Now do the yearly movements
+  #Note use of "tail" to pull off the last value in a vector
+  y0[1]=tail(y,1)[2]-tail(y,1)[2]/6
+  y0[2]=tail(y,1)[3]+tail(y,1)[2]/6 - tail(y,1)[3]/4
+  y0[3]=tail(y,1)[4]+tail(y,1)[3]/4 - tail(y,1)[4]/10
+  y0[4]=tail(y,1)[5]+tail(y,1)[4]/10
+  y0[5]=tail(y,1)[6]-tail(y,1)[6]/6
+  y0[6]=tail(y,1)[7]+tail(y,1)[6]/6 - tail(y,1)[7]/4
+  y0[7]=tail(y,1)[8]+tail(y,1)[7]/4 - tail(y,1)[8]/10
+  y0[8]=tail(y,1)[9]+tail(y,1)[8]/10
+  y0[9]=tail(y,1)[10]-tail(y,1)[10]/6
+  y0[10]=tail(y,1)[11]+tail(y,1)[10]/6 - tail(y,1)[11]/4
+  y0[11]=tail(y,1)[12]+tail(y,1)[11]/4 - tail(y,1)[12]/10
+  y0[12]=tail(y,1)[13]+tail(y,1)[12]/10
+  T0=tail(T,1)
+}
+
+
+###################################################
+### code chunk number 7: structured-models.rnw:148-163
+###################################################
+
+#plot
+par(mfrow=c(2,1))    #set up plotting region
+plot(T,S[,1],type='l',xlim=c(0,45000),ylim=c(0,0.06),xlab='Time (days)',
+     ylab='Proportion susceptible') #plot susceptibles in youngest age class
+lines(T,S[,2],col='blue')           #susceptibles in second age class
+lines(T,S[,3],col='red')            #susceptibles in third age class
+lines(T,S[,4],col='green')          #susceptibles in oldest age class
+legend(x='topright',legend=c('<5','6-9','10-19','20+'),  #add legent
+     col=c('black','blue','red','green'),lty=1,bty='n')
+plot(T,I[,1],type='l',log='y',xlim=c(0,45000),xlab='Time (days)', #plot infected
+     ylab='Proportion infected')
+lines(T,I[,2],col='blue')
+lines(T,I[,3],col='red')
+lines(T,I[,4],col='green')
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+
+###################################################
+### code chunk number 4: structured-models.rnw:86-99
+###################################################
+age.model<-function(t,x,parms){  #a function to return derivatives of age structured model
+ S<-x[1:4]     #S are the first four elements of x
+ E<-x[5:8]     #E are the next four elements of x
+ I<-x[9:12]    #I are the last four elements ofx
+ dx<-vector(length=12)   #a vector to store the derivatives
+  for(a in 1:4){   #loop over age classes
+   tmp <- (parms$beta[a,]%*%I)*S[a]   #temporary variable with infection rate
+   dx[a] <- parms$nu[a]*55/75 - tmp - parms$mu[a]*S[a]                 #dS
+   dx[a+4] <- tmp - parms$sigma*E[a] - parms$mu[a]*E[a]                #dE
+   dx[a+8] <- parms$sigma*E[a] - parms$gamma*I[a] - parms$mu[a]*I[a]   #dI
+ }  
+return(list(dx))  #return the result
+}
+
+
+###################################################
+### code chunk number 5: structured-models.rnw:104-112
+###################################################
+y0<-c(0.05, 0.01, 0.01, 0.008, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001)
+#initialize state variables
+
+#a list of model parameters
+parms<-list(beta=matrix(c(3.089, 2.089, 2.086, 2.037, 
+                          2.089, 9.336, 2.086, 2.037, 
+                          2.086, 2.086, 6.086, 2.037, 
+                          2.037, 2.037, 2.037, 4.037),nrow=4,byrow=TRUE),
+            sigma=1/8, gamma=1/5, nu=c(1/(55*365),0,0,0),  mu=c(1/(55*365),0,0,0))
+parms
+
+
+###################################################
+### code chunk number 6: structured-models.rnw:117-146
+###################################################
+n=c(6,4,10,55)/75   #number of years in each age class
+maxTime <- 100*365  #number of days in 100 years
+T0=0                #initial time
+S=c()               #initialize S
+E=c()               #initialize E
+I=c()               #initialize E
+T=c()               #initialize T, a vector to hold times
+while(T0<maxTime){  #loop over times
+  y=lsoda(y0,c(T0, T0+365),age.model,parms) #solve diff'l equation for each time
+  T=rbind(T, y[2,1])      #store results
+  S=rbind(S, y[2,2:5])
+  E=rbind(E, y[2,6:9])
+  I=rbind(I, y[2,10:13])
+  #Now do the yearly movements
+  #Note use of "tail" to pull off the last value in a vector
+  y0[1]=tail(y,1)[2]-tail(y,1)[2]/6
+  y0[2]=tail(y,1)[3]+tail(y,1)[2]/6 - tail(y,1)[3]/4
+  y0[3]=tail(y,1)[4]+tail(y,1)[3]/4 - tail(y,1)[4]/10
+  y0[4]=tail(y,1)[5]+tail(y,1)[4]/10
+  y0[5]=tail(y,1)[6]-tail(y,1)[6]/6
+  y0[6]=tail(y,1)[7]+tail(y,1)[6]/6 - tail(y,1)[7]/4
+  y0[7]=tail(y,1)[8]+tail(y,1)[7]/4 - tail(y,1)[8]/10
+  y0[8]=tail(y,1)[9]+tail(y,1)[8]/10
+  y0[9]=tail(y,1)[10]-tail(y,1)[10]/6
+  y0[10]=tail(y,1)[11]+tail(y,1)[10]/6 - tail(y,1)[11]/4
+  y0[11]=tail(y,1)[12]+tail(y,1)[11]/4 - tail(y,1)[12]/10
+  y0[12]=tail(y,1)[13]+tail(y,1)[12]/10
+  T0=tail(T,1)
+}
+
+
+###################################################
+### code chunk number 7: structured-models.rnw:148-163
+###################################################
+
+#plot
+par(mfrow=c(2,1))    #set up plotting region
+plot(T,S[,1],type='l',xlim=c(0,45000),ylim=c(0,0.06),xlab='Time (days)',
+     ylab='Proportion susceptible') #plot susceptibles in youngest age class
+lines(T,S[,2],col='blue')           #susceptibles in second age class
+lines(T,S[,3],col='red')            #susceptibles in third age class
+lines(T,S[,4],col='green')          #susceptibles in oldest age class
+legend(x='topright',legend=c('<5','6-9','10-19','20+'),  #add legent
+     col=c('black','blue','red','green'),lty=1,bty='n')
+plot(T,I[,1],type='l',log='y',xlim=c(0,45000),xlab='Time (days)', #plot infected
+     ylab='Proportion infected')
+lines(T,I[,2],col='blue')
+lines(T,I[,3],col='red')
+lines(T,I[,4],col='green')
+
+
+
+
+
+```
